@@ -1,0 +1,14 @@
+# IDEs y Sistema
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# Carpetas de dependencias de los subproyectos
+**/node_modules/
+**/build/
+**/.gradle/
+**/dist/
+
+# Variables de entorno
+.env
