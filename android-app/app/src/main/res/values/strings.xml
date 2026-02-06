@@ -1,3 +1,25 @@
 <resources>
     <string name="app_name">AgenTasker</string>
+
+    <!-- Google OAuth 2.0 Android Client ID -->
+    <!-- Android Client ID recreado el 6 de febrero de 2026 -->
+    <!-- Package: com.agentasker, SHA-1: D3:B0:F9:66:D6:00:11:88:0E:20:E7:E5:D7:6C:2C:ED:41:A2:44:BA -->
+    <string name="google_web_client_id">269011184182-svasbae2pnicm63fk9j3s5h190tfli5u.apps.googleusercontent.com</string>
+
+    <!-- Task Form -->
+    <string name="task_new_title">Nueva Tarea</string>
+    <string name="task_edit_title">Editar Tarea</string>
+    <string name="task_field_title">Título</string>
+    <string name="task_field_title_placeholder">Ingresa el título de la tarea</string>
+    <string name="task_field_description">Descripción</string>
+    <string name="task_field_description_placeholder">Describe la tarea…</string>
+    <string name="task_field_priority">Prioridad</string>
+    <string name="task_button_create">Crear</string>
+    <string name="task_button_save">Guardar</string>
+    <string name="task_button_cancel">Cancelar</string>
+
+    <!-- Priority -->
+    <string name="priority_high">Alta</string>
+    <string name="priority_medium">Media</string>
+    <string name="priority_low">Baja</string>
 </resources>
