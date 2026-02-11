@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "751642418230",
+    "project_id": "agentasker-48ddd",
+    "storage_bucket": "agentasker-48ddd.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:751642418230:android:b99cd93906284560b08c97",
+        "android_client_info": {
+          "package_name": "com.agentasker"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "751642418230-dg970vfg6gd566vc90d1g0h1qmh37osd.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDvyWWIlkziART6d6m9inca804qN0w7zQg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "751642418230-dg970vfg6gd566vc90d1g0h1qmh37osd.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
