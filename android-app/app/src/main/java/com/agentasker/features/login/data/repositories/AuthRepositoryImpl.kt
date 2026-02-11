@@ -18,17 +18,26 @@ class AuthRepositoryImpl(
 
     override suspend fun signInWithGoogle(idToken: String): Result<User> {
         return try {
+            android.util.Log.d("AuthRepositoryImpl", "Enviando idToken al backend...")
+
             val request = GoogleSignInRequestDTO(idToken = idToken)
             val response = api.signInWithGoogle(request)
+
+            android.util.Log.d("AuthRepositoryImpl", "Respuesta del backend recibida")
 
             val user = response.user.toDomain()
             val token = response.token.toDomain()
 
+            android.util.Log.d("AuthRepositoryImpl", "Guardando tokens y usuario en almacenamiento seguro")
+
             secureStorage.saveAuthToken(token)
             secureStorage.saveUser(user)
 
+            android.util.Log.d("AuthRepositoryImpl", "Usuario guardado: ${user.email}")
+
             Result.success(user)
         } catch (e: Exception) {
+            android.util.Log.e("AuthRepositoryImpl", "Error al sincronizar con backend", e)
             Result.failure(e)
         }
     }

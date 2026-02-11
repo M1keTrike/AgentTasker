@@ -11,7 +11,7 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
 
-class AppContainer(private val context: Context) {
+class AppContainer(val context: Context) {
 
     private val _baseUrl = BuildConfig.API_BASE_URL
 

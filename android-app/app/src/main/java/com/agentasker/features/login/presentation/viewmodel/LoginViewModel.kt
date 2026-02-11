@@ -1,11 +1,15 @@
 package com.agentasker.features.login.presentation.viewmodel
 
-import android.content.Intent
-import android.net.Uri
+import android.content.Context
+import androidx.credentials.exceptions.GetCredentialCancellationException
+import androidx.credentials.exceptions.GetCredentialException
+import androidx.credentials.exceptions.NoCredentialException
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.agentasker.features.login.domain.usecases.GetCurrentUserUseCase
 import com.agentasker.features.login.domain.usecases.LoginUseCase
 import com.agentasker.features.login.domain.usecases.RegisterUseCase
+import com.agentasker.features.login.domain.usecases.SignInWithGoogleUseCase
 import com.agentasker.features.login.domain.usecases.SignOutUseCase
 import com.agentasker.features.login.presentation.screens.LoginUiState
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -16,17 +20,38 @@ import kotlinx.coroutines.launch
 class LoginViewModel(
     private val loginUseCase: LoginUseCase,
     private val registerUseCase: RegisterUseCase,
-    private val signOutUseCase: SignOutUseCase
+    private val signOutUseCase: SignOutUseCase,
+    private val signInWithGoogleUseCase: SignInWithGoogleUseCase,
+    private val getCurrentUserUseCase: GetCurrentUserUseCase,
+    private val context: Context
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(LoginUiState())
     val uiState: StateFlow<LoginUiState> = _uiState.asStateFlow()
 
-    companion object {
-        private const val GOOGLE_CLIENT_ID = "demo"
-        private const val REDIRECT_URI = "com.agentasker://oauth2redirect"
-        private const val OAUTH_BASE_URL = "https://accounts.google.com/o/oauth2/v2/auth"
-        private const val SCOPES = "openid%20email%20profile"
+    init {
+        // Verificar si el usuario ya está autenticado al iniciar
+        android.util.Log.d("LoginViewModel", "init - Verificando estado de autenticación")
+        checkAuthenticationState()
+    }
+
+    private fun checkAuthenticationState() {
+        viewModelScope.launch {
+            try {
+                val user = getCurrentUserUseCase()
+                if (user != null) {
+                    android.util.Log.d("LoginViewModel", "Usuario autenticado encontrado: ${user.email}")
+                    _uiState.value = _uiState.value.copy(
+                        isAuthenticated = true,
+                        currentUser = user
+                    )
+                } else {
+                    android.util.Log.d("LoginViewModel", "No hay usuario autenticado")
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("LoginViewModel", "Error al verificar autenticación", e)
+            }
+        }
     }
 
     fun login(username: String, password: String) {
@@ -51,6 +76,47 @@ class LoginViewModel(
         }
     }
 
+    fun signInWithGoogle(context: Context) {
+        _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+
+        viewModelScope.launch {
+            try {
+                android.util.Log.d("LoginViewModel", "Iniciando proceso de Google Sign In")
+
+                signInWithGoogleUseCase(context)
+                    .onSuccess { user ->
+                        android.util.Log.d("LoginViewModel", "Google Sign In exitoso: ${user.email}")
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            isAuthenticated = true,
+                            currentUser = user,
+                            error = null
+                        )
+                        android.util.Log.d("LoginViewModel", "Estado actualizado - isAuthenticated: ${_uiState.value.isAuthenticated}")
+                    }
+                    .onFailure { exception ->
+                        android.util.Log.e("LoginViewModel", "Error en Google Sign In", exception)
+                        val errorMessage = when (exception) {
+                            is GetCredentialCancellationException -> "Inicio de sesión cancelado"
+                            is NoCredentialException -> "No hay cuentas de Google disponibles"
+                            is GetCredentialException -> "Error al obtener credenciales: ${exception.message}"
+                            else -> exception.message ?: "Error al iniciar sesión con Google"
+                        }
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            error = errorMessage
+                        )
+                    }
+            } catch (e: Exception) {
+                android.util.Log.e("LoginViewModel", "Excepción inesperada en signInWithGoogle", e)
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    error = e.message ?: "Error inesperado"
+                )
+            }
+        }
+    }
+
     fun register(username: String, email: String, password: String) {
         _uiState.value = _uiState.value.copy(isLoading = true, error = null)
 
@@ -70,7 +136,7 @@ class LoginViewModel(
 
     fun signOut() {
         viewModelScope.launch {
-            signOutUseCase()
+            signOutUseCase(context)
             _uiState.value = LoginUiState()
         }
     }
@@ -110,20 +176,6 @@ class LoginViewModel(
 
     fun updatePassword(password: String) {
         _uiState.value = _uiState.value.copy(password = password)
-    }
-
-    fun createGoogleSignInIntent(): Intent {
-        val authUrl = buildString {
-            append(OAUTH_BASE_URL)
-            append("?client_id=$GOOGLE_CLIENT_ID")
-            append("&redirect_uri=$REDIRECT_URI")
-            append("&response_type=code")
-            append("&scope=$SCOPES")
-        }
-
-        return Intent(Intent.ACTION_VIEW).apply {
-            data = Uri.parse(authUrl)
-        }
     }
 }
 

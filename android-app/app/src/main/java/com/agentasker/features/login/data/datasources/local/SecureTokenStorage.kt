@@ -2,24 +2,87 @@ package com.agentasker.features.login.data.datasources.local
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.util.Log
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.agentasker.features.login.domain.entities.AuthToken
 import com.agentasker.features.login.domain.entities.User
+import java.security.GeneralSecurityException
 
-class SecureTokenStorage(context: Context) {
+class SecureTokenStorage(private val context: Context) {
 
     private val masterKey = MasterKey.Builder(context)
         .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
         .build()
 
-    private val sharedPreferences: SharedPreferences = EncryptedSharedPreferences.create(
-        context,
-        "auth_secure_prefs",
-        masterKey,
-        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-    )
+    private val sharedPreferences: SharedPreferences by lazy {
+        createEncryptedPreferences()
+    }
+
+    /**
+     * Crea EncryptedSharedPreferences con manejo de errores de corrupción.
+     * Si los datos están corruptos, los elimina y crea nuevos preferences limpios.
+     */
+    private fun createEncryptedPreferences(): SharedPreferences {
+        return try {
+            EncryptedSharedPreferences.create(
+                context,
+                PREFS_NAME,
+                masterKey,
+                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+            )
+        } catch (e: GeneralSecurityException) {
+            Log.e(TAG, "Error al crear EncryptedSharedPreferences (datos corruptos), limpiando...", e)
+            // Los datos están corruptos, eliminar y crear nuevos
+            deleteCorruptedPreferences()
+
+            // Reintentar la creación
+            EncryptedSharedPreferences.create(
+                context,
+                PREFS_NAME,
+                masterKey,
+                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "Error inesperado al crear EncryptedSharedPreferences", e)
+            // Si falla nuevamente, eliminar y reintentar una última vez
+            deleteCorruptedPreferences()
+            EncryptedSharedPreferences.create(
+                context,
+                PREFS_NAME,
+                masterKey,
+                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+            )
+        }
+    }
+
+    /**
+     * Elimina los archivos de SharedPreferences corruptos.
+     */
+    private fun deleteCorruptedPreferences() {
+        try {
+            // Eliminar el archivo de SharedPreferences
+            val prefsDir = context.applicationContext.dataDir.resolve("shared_prefs")
+            val prefsFile = prefsDir.resolve("$PREFS_NAME.xml")
+
+            if (prefsFile.exists()) {
+                val deleted = prefsFile.delete()
+                Log.d(TAG, "Archivo de preferencias eliminado: $deleted (${prefsFile.absolutePath})")
+            }
+
+            // También eliminar el master key si existe
+            val masterKeyFile = prefsDir.resolve("${PREFS_NAME}_master_key.xml")
+            if (masterKeyFile.exists()) {
+                val deleted = masterKeyFile.delete()
+                Log.d(TAG, "Archivo de master key eliminado: $deleted (${masterKeyFile.absolutePath})")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error al eliminar archivos corruptos", e)
+        }
+    }
 
     fun saveAuthToken(token: AuthToken) {
         sharedPreferences.edit().apply {
@@ -86,6 +149,9 @@ class SecureTokenStorage(context: Context) {
     }
 
     companion object {
+        private const val TAG = "SecureTokenStorage"
+        private const val PREFS_NAME = "auth_secure_prefs"
+
         private const val KEY_ACCESS_TOKEN = "access_token"
         private const val KEY_ID_TOKEN = "id_token"
         private const val KEY_REFRESH_TOKEN = "refresh_token"
