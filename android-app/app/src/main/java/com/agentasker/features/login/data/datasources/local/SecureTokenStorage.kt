@@ -19,10 +19,7 @@ class SecureTokenStorage(private val context: Context) {
         createEncryptedPreferences()
     }
 
-    /**
-     * Crea EncryptedSharedPreferences con manejo de errores de corrupción.
-     * Si los datos están corruptos, los elimina y crea nuevos preferences limpios.
-     */
+
     private fun createEncryptedPreferences(): SharedPreferences {
         return try {
             EncryptedSharedPreferences.create(
@@ -34,10 +31,9 @@ class SecureTokenStorage(private val context: Context) {
             )
         } catch (e: GeneralSecurityException) {
             Log.e(TAG, "Error al crear EncryptedSharedPreferences (datos corruptos), limpiando...", e)
-            // Los datos están corruptos, eliminar y crear nuevos
             deleteCorruptedPreferences()
 
-            // Reintentar la creación
+
             EncryptedSharedPreferences.create(
                 context,
                 PREFS_NAME,
@@ -47,7 +43,7 @@ class SecureTokenStorage(private val context: Context) {
             )
         } catch (e: Exception) {
             Log.e(TAG, "Error inesperado al crear EncryptedSharedPreferences", e)
-            // Si falla nuevamente, eliminar y reintentar una última vez
+
             deleteCorruptedPreferences()
             EncryptedSharedPreferences.create(
                 context,
@@ -59,12 +55,9 @@ class SecureTokenStorage(private val context: Context) {
         }
     }
 
-    /**
-     * Elimina los archivos de SharedPreferences corruptos.
-     */
+
     private fun deleteCorruptedPreferences() {
         try {
-            // Eliminar el archivo de SharedPreferences
             val prefsDir = context.applicationContext.dataDir.resolve("shared_prefs")
             val prefsFile = prefsDir.resolve("$PREFS_NAME.xml")
 
@@ -73,7 +66,6 @@ class SecureTokenStorage(private val context: Context) {
                 Log.d(TAG, "Archivo de preferencias eliminado: $deleted (${prefsFile.absolutePath})")
             }
 
-            // También eliminar el master key si existe
             val masterKeyFile = prefsDir.resolve("${PREFS_NAME}_master_key.xml")
             if (masterKeyFile.exists()) {
                 val deleted = masterKeyFile.delete()

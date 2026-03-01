@@ -26,6 +26,7 @@ googleGmsGoogleServices = "4.4.4"
 firebaseAuth = "24.0.1"
 googleid = "1.1.1"
 
+
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-credentials-play-services-auth-v150 = { module = "androidx.credentials:credentials-play-services-auth", version.ref = "credentialsPlayServicesAuth" }
