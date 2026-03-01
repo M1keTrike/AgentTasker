@@ -11,14 +11,26 @@ export class User {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ unique: true })
-  username: string;
+  @Column({ unique: true, nullable: true })
+  username: string | null;
 
   @Column({ unique: true })
   email: string;
 
-  @Column()
-  password: string;
+  @Column({ nullable: true })
+  password: string | null;
+
+  @Column({ nullable: true, unique: true })
+  googleId: string | null;
+
+  @Column({ nullable: true })
+  displayName: string | null;
+
+  @Column({ nullable: true })
+  photoUrl: string | null;
+
+  @Column({ default: false })
+  emailVerified: boolean;
 
   @CreateDateColumn()
   createdAt: Date;
