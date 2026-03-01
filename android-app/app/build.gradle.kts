@@ -28,6 +28,10 @@ android {
         }
         val apiBaseUrl = properties.getProperty("api.base.url", "https://agentaskerapi.alphahills.site/")
         buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
+
+        val googleWebClientId = properties.getProperty("google.web.client.id", "")
+        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"$googleWebClientId\"")
+        resValue("string", "google_web_client_id", googleWebClientId)
     }
 
     buildTypes {
