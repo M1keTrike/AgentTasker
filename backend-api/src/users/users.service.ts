@@ -56,7 +56,7 @@ export class UsersService {
       where: { username },
     });
 
-    if (!user) {
+    if (!user || !user.password) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
@@ -87,5 +87,51 @@ export class UsersService {
 
   async findByUsername(username: string): Promise<User | null> {
     return this.userRepository.findOne({ where: { username } });
+  }
+
+  async findOrCreateFromGoogle(googleData: {
+    googleId: string;
+    email: string;
+    displayName: string | null;
+    photoUrl: string | null;
+    emailVerified: boolean;
+  }): Promise<User> {
+    // 1. Try to find by googleId (returning user)
+    let user = await this.userRepository.findOne({
+      where: { googleId: googleData.googleId },
+    });
+
+    if (user) {
+      user.displayName = googleData.displayName;
+      user.photoUrl = googleData.photoUrl;
+      user.emailVerified = googleData.emailVerified;
+      return this.userRepository.save(user);
+    }
+
+    // 2. Try to find by email (existing internal account — migrate it)
+    user = await this.userRepository.findOne({
+      where: { email: googleData.email },
+    });
+
+    if (user) {
+      user.googleId = googleData.googleId;
+      user.displayName = googleData.displayName;
+      user.photoUrl = googleData.photoUrl;
+      user.emailVerified = googleData.emailVerified;
+      return this.userRepository.save(user);
+    }
+
+    // 3. Create brand-new Google user
+    const newUser = this.userRepository.create({
+      email: googleData.email,
+      googleId: googleData.googleId,
+      displayName: googleData.displayName,
+      photoUrl: googleData.photoUrl,
+      emailVerified: googleData.emailVerified,
+      username: null,
+      password: null,
+    });
+
+    return this.userRepository.save(newUser);
   }
 }

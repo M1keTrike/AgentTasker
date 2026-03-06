@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.google.gms.google.services)
 }
 
 android {
@@ -27,6 +28,10 @@ android {
         }
         val apiBaseUrl = properties.getProperty("api.base.url", "https://agentaskerapi.alphahills.site/")
         buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
+
+        val googleWebClientId = properties.getProperty("google.web.client.id", "")
+        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"$googleWebClientId\"")
+        resValue("string", "google_web_client_id", googleWebClientId)
     }
 
     buildTypes {
@@ -86,10 +91,18 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.gson)
 
-    // OAuth2 with PKCE (AppAuth) - Standard approach
-    implementation(libs.appauth)
-    implementation(libs.androidx.browser)
+    // Security & Encryption
     implementation(libs.androidx.security.crypto)
+
+    // Firebase Authentication
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.google.firebase.auth)
+
+    // Credential Manager para Google Sign-In
+    implementation(libs.androidx.credentials)
+    implementation(libs.androidx.credentials.play.services)
+    implementation(libs.googleid)
+
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

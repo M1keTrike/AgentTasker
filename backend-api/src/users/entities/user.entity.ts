@@ -11,14 +11,26 @@ export class User {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ unique: true })
-  username: string;
+  @Column({ type: 'varchar', unique: true, nullable: true })
+  username: string | null;
 
-  @Column({ unique: true })
+  @Column({ type: 'varchar', unique: true })
   email: string;
 
-  @Column()
-  password: string;
+  @Column({ type: 'varchar', nullable: true })
+  password: string | null;
+
+  @Column({ type: 'varchar', nullable: true, unique: true })
+  googleId: string | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  displayName: string | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  photoUrl: string | null;
+
+  @Column({ default: false })
+  emailVerified: boolean;
 
   @CreateDateColumn()
   createdAt: Date;
