@@ -1,0 +1,3784 @@
+
+================================================================================
+UBICACIÓN: build.gradle.kts
+================================================================================
+
+// Top-level build file where you can add configuration options common to all sub-projects/modules.
+plugins {
+    alias(libs.plugins.android.application) apply false
+    alias(libs.plugins.kotlin.android) apply false
+    alias(libs.plugins.kotlin.compose) apply false
+    alias(libs.plugins.google.gms.google.services) apply false
+}
+
+
+================================================================================
+UBICACIÓN: settings.gradle.kts
+================================================================================
+
+pluginManagement {
+    repositories {
+        google {
+            content {
+                includeGroupByRegex("com\\.android.*")
+                includeGroupByRegex("com\\.google.*")
+                includeGroupByRegex("androidx.*")
+            }
+        }
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+rootProject.name = "AgenTasker"
+include(":app")
+ 
+
+
+================================================================================
+UBICACIÓN: app\build.gradle.kts
+================================================================================
+
+import java.util.Properties
+
+plugins {
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.google.gms.google.services)
+}
+
+android {
+    namespace = "com.agentasker"
+    compileSdk = 36
+
+    defaultConfig {
+        applicationId = "com.agentasker"
+        minSdk = 24
+        targetSdk = 36
+        versionCode = 1
+        versionName = "1.0"
+
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // Leer la URL de la API desde local.properties
+        val properties = Properties()
+        val localPropertiesFile = rootProject.file("local.properties")
+        if (localPropertiesFile.exists()) {
+            properties.load(localPropertiesFile.inputStream())
+        }
+        val apiBaseUrl = properties.getProperty("api.base.url", "https://agentaskerapi.alphahills.site/")
+        buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
+    }
+
+    buildTypes {
+        release {
+            isMinifyEnabled = false
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
+    }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
+    }
+    kotlinOptions {
+        jvmTarget = "11"
+    }
+
+    // Asegurar codificación UTF-8
+    tasks.withType<JavaCompile>().configureEach {
+        options.encoding = "UTF-8"
+    }
+
+    tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+        kotlinOptions {
+            jvmTarget = "11"
+        }
+    }
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
+}
+
+dependencies {
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.activity.compose)
+    implementation(platform(libs.androidx.compose.bom))
+    implementation(libs.androidx.compose.ui)
+    implementation(libs.androidx.compose.ui.graphics)
+    implementation(libs.androidx.compose.ui.tooling.preview)
+    implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.material.icons.extended)
+
+    // Lifecycle
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.lifecycle.runtime.compose)
+
+    // Navigation
+    implementation(libs.androidx.navigation.compose)
+
+    // Networking
+    implementation(libs.retrofit)
+    implementation(libs.retrofit.converter.gson)
+    implementation(libs.okhttp)
+    implementation(libs.gson)
+
+    // Security & Encryption
+    implementation(libs.androidx.security.crypto)
+
+    // Firebase Authentication
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.google.firebase.auth)
+
+    // Credential Manager para Google Sign-In
+    implementation(libs.androidx.credentials)
+    implementation(libs.androidx.credentials.play.services)
+    implementation(libs.googleid)
+
+
+    testImplementation(libs.junit)
+    androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.espresso.core)
+    androidTestImplementation(platform(libs.androidx.compose.bom))
+    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+    debugImplementation(libs.androidx.compose.ui.tooling)
+    debugImplementation(libs.androidx.compose.ui.test.manifest)
+}
+
+
+================================================================================
+UBICACIÓN: app\logcat.gradle.kts
+================================================================================
+
+import org.gradle.api.DefaultTask
+import org.gradle.api.tasks.TaskAction
+
+abstract class LogcatTask : DefaultTask() {
+    @TaskAction
+    fun captureLogcat() {
+        val adb = android.adbExecutable
+
+        // Clear logs
+        project.exec {
+            commandLine(adb.absolutePath, "logcat", "-c")
+        }
+
+        println("Logs cleared. Open the app and try login...")
+        println("Capturing logs in 5 seconds...")
+        Thread.sleep(5000)
+
+        // Capture logs
+        val output = ByteArrayOutputStream()
+        project.exec {
+            commandLine(adb.absolutePath, "logcat", "-d")
+            standardOutput = output
+        }
+
+        val logs = output.toString()
+        val filteredLogs = logs.lines().filter {
+            it.contains("LoginScreen") || it.contains("LoginViewModel")
+        }
+
+        println("\n========================================")
+        println("CAPTURED LOGS:")
+        println("========================================")
+        filteredLogs.forEach { println(it) }
+        println("========================================")
+        println("Total: ${filteredLogs.size} lines")
+    }
+}
+
+tasks.register<LogcatTask>("captureLogs")
+
+
+
+
+================================================================================
+UBICACIÓN: app\src\main\AndroidManifest.xml
+================================================================================
+
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <application
+        android:name=".AgentTaskerApplication"
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.AgenTasker"
+        android:networkSecurityConfig="@xml/network_security_config">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:theme="@style/Theme.AgenTasker">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>
+
+
+================================================================================
+UBICACIÓN: app\src\main\java\com\agentasker\AgentTaskerApplication.kt
+================================================================================
+
+package com.agentasker
+
+import android.app.Application
+import com.agentasker.core.di.AppContainer
+
+class AgentTaskerApplication : Application() {
+
+    lateinit var appContainer: AppContainer
+        private set
+
+    override fun onCreate() {
+        super.onCreate()
+        appContainer = AppContainer(this)
+    }
+}
+
+
+
+
+================================================================================
+UBICACIÓN: app\src\main\java\com\agentasker\MainActivity.kt
+================================================================================
+
+package com.agentasker
+
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import com.agentasker.core.navigation.NavigatorWrapper
+import com.agentasker.core.navigation.Screen
+import com.agentasker.core.ui.theme.AgenTaskerTheme
+import com.agentasker.features.login.di.LoginModule
+import com.agentasker.features.login.presentation.screens.LoginScreen
+import com.agentasker.features.login.presentation.viewmodel.LoginViewModel
+import com.agentasker.features.tasks.di.TasksModule
+import com.agentasker.features.tasks.presentation.screens.TaskScreen
+
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+
+        val appContainer = (application as AgentTaskerApplication).appContainer
+
+        setContent {
+            AgenTaskerTheme {
+                AgentTaskerApp(appContainer)
+            }
+        }
+    }
+}
+
+@Composable
+fun AgentTaskerApp(appContainer: com.agentasker.core.di.AppContainer) {
+    val navController = rememberNavController()
+    val navigatorWrapper = remember { NavigatorWrapper(navController) }
+
+    val loginModule = remember {
+        LoginModule(
+            appContainer = appContainer,
+            secureTokenStorage = appContainer.secureTokenStorage,
+            context = appContainer.context
+        )
+    }
+    val loginViewModel: LoginViewModel = viewModel(
+        factory = loginModule.provideLoginViewModelFactory()
+    )
+    val loginUiState by loginViewModel.uiState.collectAsStateWithLifecycle()
+
+
+    val startDestination = if (loginUiState.isAuthenticated) {
+        Screen.Tasks.route
+    } else {
+        Screen.Login.route
+    }
+
+    NavHost(
+        navController = navController,
+        startDestination = startDestination
+    ) {
+        composable(Screen.Login.route) {
+            LoginScreen(
+                viewModel = loginViewModel,
+                onLoginSuccess = {
+                    android.util.Log.d("MainActivity", "onLoginSuccess callback ejecutado, navegando a Tasks")
+                    navigatorWrapper.navigateToTasks(clearBackStack = true)
+                    android.util.Log.d("MainActivity", "Navegación a Tasks completada")
+                }
+            )
+        }
+
+        composable(Screen.Tasks.route) {
+            TaskScreen(factory = TasksModule(appContainer).provideTaskViewModelFactory())
+        }
+    }
+}
+
+
+
+
+
+
+================================================================================
+UBICACIÓN: app\src\main\java\com\agentasker\core\di\AppContainer.kt
+================================================================================
+
+package com.agentasker.core.di
+
+import android.content.Context
+import com.agentasker.BuildConfig
+import com.agentasker.core.network.AgentTaskerApi
+import com.agentasker.features.login.data.datasources.local.SecureTokenStorage
+import com.agentasker.features.tasks.data.repositories.TaskRepositoryImpl
+import com.agentasker.features.tasks.domain.repositories.TaskRepository
+import okhttp3.OkHttpClient
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
+import java.util.concurrent.TimeUnit
+
+class AppContainer(val context: Context) {
+
+    private val _baseUrl = BuildConfig.API_BASE_URL
+
+    private val okHttpClient: OkHttpClient by lazy {
+        OkHttpClient.Builder()
+            .connectTimeout(60, TimeUnit.SECONDS)
+            .readTimeout(60, TimeUnit.SECONDS)
+            .writeTimeout(60, TimeUnit.SECONDS)
+            .addInterceptor(com.agentasker.core.network.AuthInterceptor(secureTokenStorage))
+            .build()
+    }
+
+    val retrofit: Retrofit by lazy {
+        Retrofit.Builder()
+            .baseUrl(_baseUrl)
+            .client(okHttpClient)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+    }
+
+    val agentTaskerApi: AgentTaskerApi by lazy {
+        retrofit.create(AgentTaskerApi::class.java)
+    }
+
+    val taskRepository: TaskRepository by lazy {
+        TaskRepositoryImpl(agentTaskerApi)
+    }
+
+    val secureTokenStorage: SecureTokenStorage by lazy {
+        SecureTokenStorage(context)
+    }
+}
+
+
+
+
+================================================================================
+UBICACIÓN: app\src\main\java\com\agentasker\core\navigation\NavigatorWrapper.kt
+================================================================================
+
+package com.agentasker.core.navigation
+
+import androidx.navigation.NavHostController
+import androidx.navigation.NavOptionsBuilder
+
+class NavigatorWrapper(private val navController: NavHostController) {
+
+    fun navigateToTasks(clearBackStack: Boolean = false) {
+        if (clearBackStack) {
+            navController.navigate(Screen.Tasks.route) {
+                popUpTo(0) { inclusive = true }
+            }
+        } else {
+            navController.navigate(Screen.Tasks.route)
+        }
+    }
+
+}
+
+
+
+
+================================================================================
+UBICACIÓN: app\src\main\java\com\agentasker\core\navigation\Screen.kt
+================================================================================
+
+package com.agentasker.core.navigation
+
+sealed class Screen(val route: String) {
+    object Login : Screen("login")
+    object Tasks : Screen("tasks")
+}
+
+
+
+
+================================================================================
+UBICACIÓN: app\src\main\java\com\agentasker\core\network\AgentTaskerApi.kt
+================================================================================
+
+package com.agentasker.core.network
+
+import com.agentasker.features.login.data.datasources.remote.model.AuthResponseDTO
+import com.agentasker.features.login.data.datasources.remote.model.GoogleSignInRequestDTO
+import com.agentasker.features.login.data.datasources.remote.model.LoginRequestDTO
+import com.agentasker.features.login.data.datasources.remote.model.LoginResponseDTO
+import com.agentasker.features.login.data.datasources.remote.model.ProfileResponseDTO
+import com.agentasker.features.login.data.datasources.remote.model.RegisterRequestDTO
+import com.agentasker.features.login.data.datasources.remote.model.RegisterResponseDTO
+import com.agentasker.features.tasks.data.datasources.remote.model.CreateTaskRequest
+import com.agentasker.features.tasks.data.datasources.remote.model.TaskDTO
+import com.agentasker.features.tasks.data.datasources.remote.model.TaskResponse
+import com.agentasker.features.tasks.data.datasources.remote.model.UpdateTaskRequest
+import retrofit2.Response
+import retrofit2.http.Body
+import retrofit2.http.DELETE
+import retrofit2.http.GET
+import retrofit2.http.PATCH
+import retrofit2.http.POST
+import retrofit2.http.Path
+
+interface AgentTaskerApi {
+
+    @GET("tasks")
+    suspend fun getTasks(): TaskResponse
+
+    @GET("tasks/{id}")
+    suspend fun getTaskById(@Path("id") id: Int): TaskDTO
+
+    @POST("tasks")
+    suspend fun createTask(@Body request: CreateTaskRequest): TaskDTO
+
+    @PATCH("tasks/{id}")
+    suspend fun updateTask(@Path("id") id: Int, @Body request: UpdateTaskRequest): TaskDTO
+
+    @DELETE("tasks/{id}")
+    suspend fun deleteTask(@Path("id") id: Int): Response<Unit>
+
+    @POST("auth/google")
+    suspend fun signInWithGoogle(@Body request: GoogleSignInRequestDTO): AuthResponseDTO
+
+    @GET("auth/me")
+    suspend fun getCurrentUser(): AuthResponseDTO
+
+    @POST("users/login")
+    suspend fun login(@Body request: LoginRequestDTO): LoginResponseDTO
+
+    @POST("users/register")
+    suspend fun register(@Body request: RegisterRequestDTO): RegisterResponseDTO
+
+    @GET("users/profile")
+    suspend fun getProfile(): ProfileResponseDTO
+
+}
+
+
+
+
+
+================================================================================
+UBICACIÓN: app\src\main\java\com\agentasker\core\network\AuthInterceptor.kt
+================================================================================
+
+package com.agentasker.core.network
+
+import com.agentasker.features.login.data.datasources.local.SecureTokenStorage
+import okhttp3.Interceptor
+import okhttp3.Response
+
+class AuthInterceptor(
+    private val tokenStorage: SecureTokenStorage
+) : Interceptor {
+
+    override fun intercept(chain: Interceptor.Chain): Response {
+        val token = tokenStorage.getAuthToken()
+
+        val request = if (token != null && tokenStorage.isTokenValid()) {
+            chain.request().newBuilder()
+                .addHeader("Authorization", "Bearer ${token.accessToken}")
+                .build()
+        } else {
+            chain.request()
+        }
+
+        return chain.proceed(request)
+    }
+}
+
+
+
+
+================================================================================
+UBICACIÓN: app\src\main\java\com\agentasker\core\ui\components\EmptyState.kt
+================================================================================
+
+package com.agentasker.core.ui.components
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+
+@Composable
+fun EmptyState(
+    message: String,
+    icon: ImageVector = Icons.Outlined.Info,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            modifier = Modifier.size(64.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Text(
+            text = message,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+
+
+
+================================================================================
+UBICACIÓN: app\src\main\java\com\agentasker\core\ui\components\GoogleSignInButton.kt
+================================================================================
+
+package com.agentasker.core.ui.components
+
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+
+@Composable
+fun GoogleSignInButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true
+) {
+    OutlinedButton(
+        onClick = onClick,
+        modifier = modifier
+            .fillMaxWidth()
+            .height(56.dp),
+        enabled = enabled,
+        colors = ButtonDefaults.outlinedButtonColors(
+            containerColor = Color.White,
+            contentColor = Color.Black
+        ),
+        border = BorderStroke(1.dp, Color.Gray.copy(alpha = 0.3f))
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(
+                text = "G",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF4285F4),
+                modifier = Modifier.padding(end = 12.dp)
+            )
+            Text(
+                text = "Continuar con Google",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Medium,
+                color = Color.Black
+            )
+        }
+    }
+}
+
+
+
+
+================================================================================
+UBICACIÓN: app\src\main\java\com\agentasker\core\ui\components\LoadingState.kt
+================================================================================
+
+package com.agentasker.core.ui.components
+
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+
+@Composable
+fun LoadingState(
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        CircularProgressIndicator()
+    }
+}
+
+
+
+
+================================================================================
+UBICACIÓN: app\src\main\java\com\agentasker\core\ui\components\PasswordTextField.kt
+================================================================================
+
+package com.agentasker.core.ui.components
+
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
+
+@Composable
+fun PasswordTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    label: String = "Contraseña",
+    placeholder: String = "Ingresa tu contraseña",
+    enabled: Boolean = true,
+    isError: Boolean = false,
+    imeAction: ImeAction = ImeAction.Done,
+    keyboardActions: KeyboardActions = KeyboardActions.Default,
+    isPasswordVisible: Boolean,
+    onPasswordVisibilityChange: () -> Unit
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(label) },
+        placeholder = { Text(placeholder) },
+        modifier = modifier,
+        enabled = enabled,
+        isError = isError,
+        singleLine = true,
+        visualTransformation = if (isPasswordVisible)
+            VisualTransformation.None
+        else
+            PasswordVisualTransformation(),
+        keyboardOptions = KeyboardOptions(
+            keyboardType = KeyboardType.Password,
+            imeAction = imeAction
+        ),
+        keyboardActions = keyboardActions,
+        trailingIcon = {
+            TextButton(onClick = onPasswordVisibilityChange) {
+                Text(
+                    text = if (isPasswordVisible) "👁️" else "👁️‍🗨️"
+                )
+            }
+        }
+    )
+}
+
+
+
+
+================================================================================
+UBICACIÓN: app\src\main\java\com\agentasker\core\ui\components\PriorityBadge.kt
+================================================================================
+
+package com.agentasker.core.ui.components
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
+
+@Composable
+fun PriorityBadge(
+    priority: String,
+    modifier: Modifier = Modifier
+) {
+    val (priorityText, priorityColor) = when (priority.lowercase()) {
+        "high" -> "Alta" to Color(0xFFFF5252)
+        "low" -> "Baja" to Color(0xFF4CAF50)
+        else -> "Media" to Color(0xFFFFA726)
+    }
+
+    Text(
+        text = priorityText,
+        style = MaterialTheme.typography.labelSmall,
+        color = Color.White,
+        modifier = modifier
+            .background(
+                color = priorityColor,
+                shape = RoundedCornerShape(4.dp)
+            )
+            .padding(horizontal = 8.dp, vertical = 2.dp)
+    )
+}
+
+
+
+
+================================================================================
+UBICACIÓN: app\src\main\java\com\agentasker\core\ui\components\PrioritySelector.kt
+================================================================================
+
+package com.agentasker.core.ui.components
+
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.MenuAnchorType
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import com.agentasker.R
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PrioritySelector(
+    selectedPriority: String,
+    onPriorityChange: (String) -> Unit,
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val priorities = listOf(
+        "high" to stringResource(R.string.priority_high),
+        "medium" to stringResource(R.string.priority_medium),
+        "low" to stringResource(R.string.priority_low)
+    )
+
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = onExpandedChange,
+        modifier = modifier
+    ) {
+        OutlinedTextField(
+            value = priorities.find { it.first == selectedPriority }?.second ?: stringResource(R.string.priority_medium),
+            onValueChange = {},
+            readOnly = true,
+            label = { Text(stringResource(R.string.task_field_priority)) },
+            trailingIcon = {
+                ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
+            },
+            colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
+            modifier = Modifier
+                .menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
+                .fillMaxWidth()
+        )
+
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { onExpandedChange(false) }
+        ) {
+            priorities.forEach { (value, displayLabel) ->
+                DropdownMenuItem(
+                    text = { Text(displayLabel) },
+                    onClick = {
+                        onPriorityChange(value)
+                        onExpandedChange(false)
+                    }
+                )
+            }
+        }
+    }
+}
+
+
+
+
+================================================================================
+UBICACIÓN: app\src\main\java\com\agentasker\core\ui\components\TextDivider.kt
+================================================================================
+
+package com.agentasker.core.ui.components
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+
+@Composable
+fun TextDivider(
+    text: String,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        HorizontalDivider(modifier = Modifier.weight(1f))
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        HorizontalDivider(modifier = Modifier.weight(1f))
+    }
+}
+
+
+
+
+================================================================================
+UBICACIÓN: app\src\main\java\com\agentasker\core\ui\theme\Color.kt
+================================================================================
+
+package com.agentasker.core.ui.theme
+
+import androidx.compose.ui.graphics.Color
+
+val Purple80 = Color(0xFFD0BCFF)
+val PurpleGrey80 = Color(0xFFCCC2DC)
+val Pink80 = Color(0xFFEFB8C8)
+
+val Purple40 = Color(0xFF6650a4)
+val PurpleGrey40 = Color(0xFF625b71)
+val Pink40 = Color(0xFF7D5260)
+
+
+
+
+================================================================================
+UBICACIÓN: app\src\main\java\com\agentasker\core\ui\theme\Theme.kt
+================================================================================
+
+package com.agentasker.core.ui.theme
+
+import android.os.Build
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
+import androidx.compose.material3.lightColorScheme
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalContext
+
+private val DarkColorScheme = darkColorScheme(
+    primary = Purple80,
+    secondary = PurpleGrey80,
+    tertiary = Pink80
+)
+
+private val LightColorScheme = lightColorScheme(
+    primary = Purple40,
+    secondary = PurpleGrey40,
+    tertiary = Pink40
+)
+
+@Composable
+fun AgenTaskerTheme(
+    darkTheme: Boolean = isSystemInDarkTheme(),
+    dynamicColor: Boolean = true,
+    content: @Composable () -> Unit
+) {
+    val colorScheme = when {
+        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+            val context = LocalContext.current
+            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+        }
+
+        darkTheme -> DarkColorScheme
+        else -> LightColorScheme
+    }
+
+    MaterialTheme(
+        colorScheme = colorScheme,
+        typography = Typography,
+        content = content
+    )
+}
+
+
+
+
+================================================================================
+UBICACIÓN: app\src\main\java\com\agentasker\core\ui\theme\Type.kt
+================================================================================
+
+package com.agentasker.core.ui.theme
+
+import androidx.compose.material3.Typography
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
+
+val Typography = Typography(
+    bodyLarge = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Normal,
+        fontSize = 16.sp,
+        lineHeight = 24.sp,
+        letterSpacing = 0.5.sp
+    ),
+    titleLarge = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Normal,
+        fontSize = 22.sp,
+        lineHeight = 28.sp,
+        letterSpacing = 0.sp
+    ),
+    labelSmall = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Medium,
+        fontSize = 11.sp,
+        lineHeight = 16.sp,
+        letterSpacing = 0.5.sp
+    )
+)
+
+
+
+
+================================================================================
+UBICACIÓN: app\src\main\java\com\agentasker\features\login\data\datasources\local\SecureTokenStorage.kt
+================================================================================
+
+package com.agentasker.features.login.data.datasources.local
+
+import android.content.Context
+import android.content.SharedPreferences
+import android.util.Log
+import androidx.security.crypto.EncryptedSharedPreferences
+import androidx.security.crypto.MasterKey
+import com.agentasker.features.login.domain.entities.AuthToken
+import com.agentasker.features.login.domain.entities.User
+import java.security.GeneralSecurityException
+
+class SecureTokenStorage(private val context: Context) {
+
+    private val masterKey = MasterKey.Builder(context)
+        .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+        .build()
+
+    private val sharedPreferences: SharedPreferences by lazy {
+        createEncryptedPreferences()
+    }
+
+    /**
+     * Crea EncryptedSharedPreferences con manejo de errores de corrupción.
+     * Si los datos están corruptos, los elimina y crea nuevos preferences limpios.
+     */
+    private fun createEncryptedPreferences(): SharedPreferences {
+        return try {
+            EncryptedSharedPreferences.create(
+                context,
+                PREFS_NAME,
+                masterKey,
+                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+            )
+        } catch (e: GeneralSecurityException) {
+            Log.e(TAG, "Error al crear EncryptedSharedPreferences (datos corruptos), limpiando...", e)
+            // Los datos están corruptos, eliminar y crear nuevos
+            deleteCorruptedPreferences()
+
+            // Reintentar la creación
+            EncryptedSharedPreferences.create(
+                context,
+                PREFS_NAME,
+                masterKey,
+                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "Error inesperado al crear EncryptedSharedPreferences", e)
+            // Si falla nuevamente, eliminar y reintentar una última vez
+            deleteCorruptedPreferences()
+            EncryptedSharedPreferences.create(
+                context,
+                PREFS_NAME,
+                masterKey,
+                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+            )
+        }
+    }
+
+    /**
+     * Elimina los archivos de SharedPreferences corruptos.
+     */
+    private fun deleteCorruptedPreferences() {
+        try {
+            // Eliminar el archivo de SharedPreferences
+            val prefsDir = context.applicationContext.dataDir.resolve("shared_prefs")
+            val prefsFile = prefsDir.resolve("$PREFS_NAME.xml")
+
+            if (prefsFile.exists()) {
+                val deleted = prefsFile.delete()
+                Log.d(TAG, "Archivo de preferencias eliminado: $deleted (${prefsFile.absolutePath})")
+            }
+
+            // También eliminar el master key si existe
+            val masterKeyFile = prefsDir.resolve("${PREFS_NAME}_master_key.xml")
+            if (masterKeyFile.exists()) {
+                val deleted = masterKeyFile.delete()
+                Log.d(TAG, "Archivo de master key eliminado: $deleted (${masterKeyFile.absolutePath})")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error al eliminar archivos corruptos", e)
+        }
+    }
+
+    fun saveAuthToken(token: AuthToken) {
+        sharedPreferences.edit().apply {
+            putString(KEY_ACCESS_TOKEN, token.accessToken)
+            putString(KEY_ID_TOKEN, token.idToken)
+            putString(KEY_REFRESH_TOKEN, token.refreshToken)
+            putLong(KEY_EXPIRES_IN, token.expiresIn)
+            putLong(KEY_TOKEN_TIMESTAMP, System.currentTimeMillis())
+            apply()
+        }
+    }
+
+    fun getAuthToken(): AuthToken? {
+        val accessToken = sharedPreferences.getString(KEY_ACCESS_TOKEN, null) ?: return null
+        val idToken = sharedPreferences.getString(KEY_ID_TOKEN, null)
+        val refreshToken = sharedPreferences.getString(KEY_REFRESH_TOKEN, null)
+        val expiresIn = sharedPreferences.getLong(KEY_EXPIRES_IN, 0L)
+
+        return AuthToken(
+            accessToken = accessToken,
+            idToken = idToken,
+            refreshToken = refreshToken,
+            expiresIn = expiresIn
+        )
+    }
+
+    fun saveUser(user: User) {
+        sharedPreferences.edit().apply {
+            putString(KEY_USER_ID, user.id)
+            putString(KEY_USER_EMAIL, user.email)
+            putString(KEY_USER_DISPLAY_NAME, user.displayName)
+            putString(KEY_USER_PHOTO_URL, user.photoUrl)
+            putBoolean(KEY_USER_EMAIL_VERIFIED, user.isEmailVerified)
+            apply()
+        }
+    }
+
+    fun getUser(): User? {
+        val id = sharedPreferences.getString(KEY_USER_ID, null) ?: return null
+        val email = sharedPreferences.getString(KEY_USER_EMAIL, null) ?: return null
+        val displayName = sharedPreferences.getString(KEY_USER_DISPLAY_NAME, null)
+        val photoUrl = sharedPreferences.getString(KEY_USER_PHOTO_URL, null)
+        val emailVerified = sharedPreferences.getBoolean(KEY_USER_EMAIL_VERIFIED, false)
+
+        return User(
+            id = id,
+            email = email,
+            displayName = displayName,
+            photoUrl = photoUrl,
+            isEmailVerified = emailVerified
+        )
+    }
+
+    fun clearAll() {
+        sharedPreferences.edit().clear().apply()
+    }
+
+    fun isTokenValid(): Boolean {
+        val timestamp = sharedPreferences.getLong(KEY_TOKEN_TIMESTAMP, 0L)
+        val expiresIn = sharedPreferences.getLong(KEY_EXPIRES_IN, 0L)
+        val currentTime = System.currentTimeMillis()
+
+        return (currentTime - timestamp) < (expiresIn * 1000)
+    }
+
+    companion object {
+        private const val TAG = "SecureTokenStorage"
+        private const val PREFS_NAME = "auth_secure_prefs"
+
+        private const val KEY_ACCESS_TOKEN = "access_token"
+        private const val KEY_ID_TOKEN = "id_token"
+        private const val KEY_REFRESH_TOKEN = "refresh_token"
+        private const val KEY_EXPIRES_IN = "expires_in"
+        private const val KEY_TOKEN_TIMESTAMP = "token_timestamp"
+
+        private const val KEY_USER_ID = "user_id"
+        private const val KEY_USER_EMAIL = "user_email"
+        private const val KEY_USER_DISPLAY_NAME = "user_display_name"
+        private const val KEY_USER_PHOTO_URL = "user_photo_url"
+        private const val KEY_USER_EMAIL_VERIFIED = "user_email_verified"
+    }
+}
+
+
+
+
+================================================================================
+UBICACIÓN: app\src\main\java\com\agentasker\features\login\data\datasources\remote\mapper\AuthMapper.kt
+================================================================================
+
+package com.agentasker.features.login.data.datasources.remote.mapper
+
+import com.agentasker.features.login.data.datasources.remote.model.AuthTokenDTO
+import com.agentasker.features.login.data.datasources.remote.model.LoginResponseDTO
+import com.agentasker.features.login.data.datasources.remote.model.UserDTO
+import com.agentasker.features.login.domain.entities.AuthToken
+import com.agentasker.features.login.domain.entities.User
+
+fun UserDTO.toDomain(): User {
+    return User(
+        id = id,
+        email = email,
+        displayName = displayName,
+        photoUrl = photoUrl,
+        isEmailVerified = emailVerified ?: false
+    )
+}
+
+fun AuthTokenDTO.toDomain(): AuthToken {
+    return AuthToken(
+        accessToken = accessToken,
+        idToken = idToken,
+        refreshToken = refreshToken,
+        expiresIn = expiresIn
+    )
+}
+
+fun LoginResponseDTO.toDomainFromLogin(): User {
+    return User(
+        id = user.id.toString(),
+        email = user.email,
+        displayName = user.username,
+        photoUrl = null,
+        isEmailVerified = true
+    )
+}
+
+
+
+
+================================================================================
+UBICACIÓN: app\src\main\java\com\agentasker\features\login\data\datasources\remote\model\AuthDTO.kt
+================================================================================
+
+package com.agentasker.features.login.data.datasources.remote.model
+
+import com.google.gson.annotations.SerializedName
+
+data class AuthResponseDTO(
+    @SerializedName("user")
+    val user: UserDTO,
+    @SerializedName("token")
+    val token: AuthTokenDTO
+)
+
+data class UserDTO(
+    @SerializedName("id")
+    val id: String,
+    @SerializedName("email")
+    val email: String,
+    @SerializedName("displayName")
+    val displayName: String?,
+    @SerializedName("photoUrl")
+    val photoUrl: String?,
+    @SerializedName("emailVerified")
+    val emailVerified: Boolean?
+)
+
+data class AuthTokenDTO(
+    @SerializedName("accessToken")
+    val accessToken: String,
+    @SerializedName("idToken")
+    val idToken: String?,
+    @SerializedName("refreshToken")
+    val refreshToken: String?,
+    @SerializedName("expiresIn")
+    val expiresIn: Long
+)
+
+data class GoogleSignInRequestDTO(
+    @SerializedName("idToken")
+    val idToken: String
+)
+
+data class LoginRequestDTO(
+    @SerializedName("username")
+    val username: String,
+    @SerializedName("password")
+    val password: String
+)
+
+data class RegisterRequestDTO(
+    @SerializedName("username")
+    val username: String,
+    @SerializedName("email")
+    val email: String,
+    @SerializedName("password")
+    val password: String
+)
+
+data class RegisterResponseDTO(
+    @SerializedName("message")
+    val message: String
+)
+
+data class LoginResponseDTO(
+    @SerializedName("accessToken")
+    val accessToken: String,
+    @SerializedName("user")
+    val user: UserLoginDTO
+)
+
+data class UserLoginDTO(
+    @SerializedName("id")
+    val id: Int,
+    @SerializedName("username")
+    val username: String,
+    @SerializedName("email")
+    val email: String
+)
+
+data class ProfileResponseDTO(
+    @SerializedName("id")
+    val id: Int,
+    @SerializedName("username")
+    val username: String,
+    @SerializedName("email")
+    val email: String
+)
+
+
+
+
+================================================================================
+UBICACIÓN: app\src\main\java\com\agentasker\features\login\data\repositories\AuthRepositoryImpl.kt
+================================================================================
+
+package com.agentasker.features.login.data.repositories
+
+import com.agentasker.core.network.AgentTaskerApi
+import com.agentasker.features.login.data.datasources.local.SecureTokenStorage
+import com.agentasker.features.login.data.datasources.remote.mapper.toDomain
+import com.agentasker.features.login.data.datasources.remote.mapper.toDomainFromLogin
+import com.agentasker.features.login.data.datasources.remote.model.GoogleSignInRequestDTO
+import com.agentasker.features.login.data.datasources.remote.model.LoginRequestDTO
+import com.agentasker.features.login.data.datasources.remote.model.RegisterRequestDTO
+import com.agentasker.features.login.domain.entities.AuthToken
+import com.agentasker.features.login.domain.entities.User
+import com.agentasker.features.login.domain.repositories.AuthRepository
+
+class AuthRepositoryImpl(
+    private val api: AgentTaskerApi,
+    private val secureStorage: SecureTokenStorage
+) : AuthRepository {
+
+    override suspend fun signInWithGoogle(idToken: String): Result<User> {
+        return try {
+            android.util.Log.d("AuthRepositoryImpl", "Enviando idToken al backend...")
+
+            val request = GoogleSignInRequestDTO(idToken = idToken)
+            val response = api.signInWithGoogle(request)
+
+            android.util.Log.d("AuthRepositoryImpl", "Respuesta del backend recibida")
+
+            val user = response.user.toDomain()
+            val token = response.token.toDomain()
+
+            android.util.Log.d("AuthRepositoryImpl", "Guardando tokens y usuario en almacenamiento seguro")
+
+            secureStorage.saveAuthToken(token)
+            secureStorage.saveUser(user)
+
+            android.util.Log.d("AuthRepositoryImpl", "Usuario guardado: ${user.email}")
+
+            Result.success(user)
+        } catch (e: Exception) {
+            android.util.Log.e("AuthRepositoryImpl", "Error al sincronizar con backend", e)
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun login(username: String, password: String): Result<User> {
+        return try {
+            val request = LoginRequestDTO(username = username, password = password)
+            val response = api.login(request)
+
+            val user = response.toDomainFromLogin()
+            val token = AuthToken(
+                accessToken = response.accessToken,
+                idToken = null,
+                refreshToken = null,
+                expiresIn = 86400L
+            )
+
+            secureStorage.saveAuthToken(token)
+            secureStorage.saveUser(user)
+
+            Result.success(user)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun register(username: String, email: String, password: String): Result<Unit> {
+        return try {
+            val request = RegisterRequestDTO(
+                username = username,
+                email = email,
+                password = password
+            )
+            api.register(request)
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun getCurrentUser(): User? {
+        return secureStorage.getUser()
+    }
+
+    override suspend fun saveAuthToken(token: AuthToken) {
+        secureStorage.saveAuthToken(token)
+    }
+
+    override suspend fun getAuthToken(): AuthToken? {
+        return secureStorage.getAuthToken()
+    }
+
+    override suspend fun clearAuthToken() {
+        secureStorage.clearAll()
+    }
+
+    override suspend fun isUserLoggedIn(): Boolean {
+        val user = secureStorage.getUser()
+        val tokenValid = secureStorage.isTokenValid()
+        return user != null && tokenValid
+    }
+}
+
+
+
+
+================================================================================
+UBICACIÓN: app\src\main\java\com\agentasker\features\login\data\services\GoogleAuthService.kt
+================================================================================
+
+package com.agentasker.features.login.data.services
+
+import android.content.Context
+import androidx.credentials.ClearCredentialStateRequest
+import androidx.credentials.CredentialManager
+import androidx.credentials.CustomCredential
+import androidx.credentials.GetCredentialRequest
+import com.agentasker.R
+import com.google.android.libraries.identity.googleid.GetGoogleIdOption
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.GoogleAuthProvider
+import kotlinx.coroutines.tasks.await
+
+/**
+ * Servicio especializado para manejar la autenticación con Google
+ * usando Credential Manager y Firebase Auth.
+ */
+class GoogleAuthService(
+    private val credentialManager: CredentialManager,
+    private val firebaseAuth: FirebaseAuth
+) {
+
+    /**
+     * Inicia el flujo de autenticación con Google.
+     *
+     * @param context Contexto de la aplicación
+     * @return ID Token de Google si la autenticación es exitosa
+     * @throws Exception si hay algún error en el proceso
+     */
+    suspend fun signInWithGoogle(context: Context): String {
+        android.util.Log.d("GoogleAuthService", "Iniciando signInWithGoogle")
+
+        // 1. Configurar la opción de ID de Google
+        val googleIdOption = GetGoogleIdOption.Builder()
+            .setFilterByAuthorizedAccounts(false) // Mostrar todas las cuentas disponibles
+            .setServerClientId(context.getString(R.string.default_web_client_id))
+            .setAutoSelectEnabled(true) // Auto-seleccionar si hay una sola cuenta
+            .build()
+
+        android.util.Log.d("GoogleAuthService", "GoogleIdOption configurada")
+
+        // 2. Crear la solicitud para Credential Manager
+        val request = GetCredentialRequest.Builder()
+            .addCredentialOption(googleIdOption)
+            .build()
+
+        android.util.Log.d("GoogleAuthService", "GetCredentialRequest creada, solicitando credenciales...")
+
+        // 3. Obtener credenciales del usuario
+        val result = credentialManager.getCredential(context, request)
+        val credential = result.credential
+
+        android.util.Log.d("GoogleAuthService", "Credenciales obtenidas: ${credential.type}")
+
+        // 4. Verificar que sea una credencial de Google
+        if (credential is CustomCredential && credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
+            val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
+            val idToken = googleIdTokenCredential.idToken
+
+            android.util.Log.d("GoogleAuthService", "ID Token extraído, autenticando en Firebase...")
+
+            // 5. Autenticar en Firebase con el ID Token
+            val authCredential = GoogleAuthProvider.getCredential(idToken, null)
+            val authResult = firebaseAuth.signInWithCredential(authCredential).await()
+
+            android.util.Log.d("GoogleAuthService", "Autenticación en Firebase exitosa: ${authResult.user?.email}")
+
+            return idToken
+        } else {
+            android.util.Log.e("GoogleAuthService", "Tipo de credencial inesperado: ${credential.type}")
+            throw IllegalStateException("Tipo de credencial inesperado: ${credential.type}")
+        }
+    }
+
+    /**
+     * Cierra la sesión del usuario en Firebase y limpia las credenciales almacenadas.
+     *
+     * @param context Contexto de la aplicación
+     */
+    suspend fun signOut(context: Context) {
+        firebaseAuth.signOut()
+        credentialManager.clearCredentialState(ClearCredentialStateRequest())
+    }
+}
+
+
+
+
+================================================================================
+UBICACIÓN: app\src\main\java\com\agentasker\features\login\di\LoginModule.kt
+================================================================================
+
+package com.agentasker.features.login.di
+
+import android.content.Context
+import androidx.credentials.CredentialManager
+import com.agentasker.core.di.AppContainer
+import com.agentasker.features.login.data.datasources.local.SecureTokenStorage
+import com.agentasker.features.login.data.repositories.AuthRepositoryImpl
+import com.agentasker.features.login.data.services.GoogleAuthService
+import com.agentasker.features.login.domain.repositories.AuthRepository
+import com.agentasker.features.login.domain.usecases.GetCurrentUserUseCase
+import com.agentasker.features.login.domain.usecases.LoginUseCase
+import com.agentasker.features.login.domain.usecases.RegisterUseCase
+import com.agentasker.features.login.domain.usecases.SignInWithGoogleUseCase
+import com.agentasker.features.login.domain.usecases.SignOutUseCase
+import com.agentasker.features.login.presentation.viewmodel.LoginViewModelFactory
+import com.google.firebase.auth.FirebaseAuth
+
+class LoginModule(
+    private val appContainer: AppContainer,
+    private val secureTokenStorage: SecureTokenStorage,
+    private val context: Context
+) {
+
+    private fun provideCredentialManager(): CredentialManager {
+        return CredentialManager.create(context)
+    }
+
+    private fun provideFirebaseAuth(): FirebaseAuth {
+        return FirebaseAuth.getInstance()
+    }
+
+    private fun provideGoogleAuthService(): GoogleAuthService {
+        return GoogleAuthService(
+            credentialManager = provideCredentialManager(),
+            firebaseAuth = provideFirebaseAuth()
+        )
+    }
+
+    private fun provideAuthRepository(): AuthRepository {
+        return AuthRepositoryImpl(
+            api = appContainer.agentTaskerApi,
+            secureStorage = secureTokenStorage
+        )
+    }
+
+    private fun provideSignInWithGoogleUseCase(): SignInWithGoogleUseCase {
+        return SignInWithGoogleUseCase(
+            authRepository = provideAuthRepository(),
+            googleAuthService = provideGoogleAuthService()
+        )
+    }
+
+    private fun provideLoginUseCase(): LoginUseCase {
+        return LoginUseCase(provideAuthRepository())
+    }
+
+    private fun provideRegisterUseCase(): RegisterUseCase {
+        return RegisterUseCase(provideAuthRepository())
+    }
+
+    private fun provideGetCurrentUserUseCase(): GetCurrentUserUseCase {
+        return GetCurrentUserUseCase(provideAuthRepository())
+    }
+
+    private fun provideSignOutUseCase(): SignOutUseCase {
+        return SignOutUseCase(
+            authRepository = provideAuthRepository(),
+            googleAuthService = provideGoogleAuthService()
+        )
+    }
+
+
+    fun provideLoginViewModelFactory(): LoginViewModelFactory {
+        return LoginViewModelFactory(
+            loginUseCase = provideLoginUseCase(),
+            registerUseCase = provideRegisterUseCase(),
+            signOutUseCase = provideSignOutUseCase(),
+            signInWithGoogleUseCase = provideSignInWithGoogleUseCase(),
+            getCurrentUserUseCase = provideGetCurrentUserUseCase(),
+            context = context
+        )
+    }
+}
+
+
+
+
+================================================================================
+UBICACIÓN: app\src\main\java\com\agentasker\features\login\domain\entities\AuthToken.kt
+================================================================================
+
+package com.agentasker.features.login.domain.entities
+
+data class AuthToken(
+    val accessToken: String,
+    val idToken: String?,
+    val refreshToken: String?,
+    val expiresIn: Long
+)
+
+
+
+
+================================================================================
+UBICACIÓN: app\src\main\java\com\agentasker\features\login\domain\entities\User.kt
+================================================================================
+
+package com.agentasker.features.login.domain.entities
+
+data class User(
+    val id: String,
+    val email: String,
+    val displayName: String?,
+    val photoUrl: String?,
+    val isEmailVerified: Boolean = false
+)
+
+
+
+
+================================================================================
+UBICACIÓN: app\src\main\java\com\agentasker\features\login\domain\repositories\AuthRepository.kt
+================================================================================
+
+package com.agentasker.features.login.domain.repositories
+
+import com.agentasker.features.login.domain.entities.AuthToken
+import com.agentasker.features.login.domain.entities.User
+
+interface AuthRepository {
+    suspend fun signInWithGoogle(idToken: String): Result<User>
+
+    suspend fun login(username: String, password: String): Result<User>
+    suspend fun register(username: String, email: String, password: String): Result<Unit>
+
+    suspend fun getCurrentUser(): User?
+    suspend fun saveAuthToken(token: AuthToken)
+    suspend fun getAuthToken(): AuthToken?
+    suspend fun clearAuthToken()
+    suspend fun isUserLoggedIn(): Boolean
+}
+
+
+
+
+================================================================================
+UBICACIÓN: app\src\main\java\com\agentasker\features\login\domain\usecases\GetCurrentUserUseCase.kt
+================================================================================
+
+package com.agentasker.features.login.domain.usecases
+
+import com.agentasker.features.login.domain.entities.User
+import com.agentasker.features.login.domain.repositories.AuthRepository
+
+class GetCurrentUserUseCase(
+    private val authRepository: AuthRepository
+) {
+    suspend operator fun invoke(): User? {
+        return authRepository.getCurrentUser()
+    }
+}
+
+
+
+
+================================================================================
+UBICACIÓN: app\src\main\java\com\agentasker\features\login\domain\usecases\LoginUseCase.kt
+================================================================================
+
+package com.agentasker.features.login.domain.usecases
+
+import com.agentasker.features.login.domain.entities.User
+import com.agentasker.features.login.domain.repositories.AuthRepository
+import com.agentasker.features.login.domain.validators.AuthValidator
+
+class LoginUseCase(
+    private val authRepository: AuthRepository
+) {
+    suspend operator fun invoke(username: String, password: String): Result<User> {
+        AuthValidator.validateUsername(username).getOrElse { return Result.failure(it) }
+        AuthValidator.validatePassword(password).getOrElse { return Result.failure(it) }
+
+        return authRepository.login(username, password)
+    }
+}
+
+
+
+================================================================================
+UBICACIÓN: app\src\main\java\com\agentasker\features\login\domain\usecases\RegisterUseCase.kt
+================================================================================
+
+package com.agentasker.features.login.domain.usecases
+
+import com.agentasker.features.login.domain.repositories.AuthRepository
+import com.agentasker.features.login.domain.validators.AuthValidator
+
+class RegisterUseCase(
+    private val authRepository: AuthRepository
+) {
+    suspend operator fun invoke(username: String, email: String, password: String): Result<Unit> {
+        AuthValidator.validateUsername(username).getOrElse { return Result.failure(it) }
+        AuthValidator.validateEmail(email).getOrElse { return Result.failure(it) }
+        AuthValidator.validatePassword(password).getOrElse { return Result.failure(it) }
+
+        return authRepository.register(username, email, password)
+    }
+}
+
+
+
+
+================================================================================
+UBICACIÓN: app\src\main\java\com\agentasker\features\login\domain\usecases\SignInWithGoogleUseCase.kt
+================================================================================
+
+package com.agentasker.features.login.domain.usecases
+
+import android.content.Context
+import com.agentasker.features.login.data.services.GoogleAuthService
+import com.agentasker.features.login.domain.entities.User
+import com.agentasker.features.login.domain.repositories.AuthRepository
+
+class SignInWithGoogleUseCase(
+    private val authRepository: AuthRepository,
+    private val googleAuthService: GoogleAuthService
+) {
+    /**
+     * Ejecuta el flujo completo de autenticación con Google:
+     * 1. Obtiene credenciales con Credential Manager
+     * 2. Autentica en Firebase
+     * 3. Sincroniza con el backend
+     *
+     * @param context Contexto de la aplicación
+     * @return Result con el User si es exitoso
+     */
+    suspend operator fun invoke(context: Context): Result<User> {
+        return try {
+            android.util.Log.d("SignInWithGoogleUseCase", "Iniciando flujo de Google Sign In")
+
+            // Obtener ID Token usando Credential Manager + Firebase
+            val idToken = googleAuthService.signInWithGoogle(context)
+            android.util.Log.d("SignInWithGoogleUseCase", "ID Token obtenido, sincronizando con backend...")
+
+            // Sincronizar con el backend
+            val result = authRepository.signInWithGoogle(idToken)
+
+            android.util.Log.d("SignInWithGoogleUseCase", "Sincronización con backend completada: ${result.isSuccess}")
+
+            result
+        } catch (e: Exception) {
+            android.util.Log.e("SignInWithGoogleUseCase", "Error en el flujo de Google Sign In", e)
+            Result.failure(e)
+        }
+    }
+}
+
+
+
+
+================================================================================
+UBICACIÓN: app\src\main\java\com\agentasker\features\login\domain\usecases\SignOutUseCase.kt
+================================================================================
+
+package com.agentasker.features.login.domain.usecases
+
+import android.content.Context
+import com.agentasker.features.login.data.services.GoogleAuthService
+import com.agentasker.features.login.domain.repositories.AuthRepository
+
+class SignOutUseCase(
+    private val authRepository: AuthRepository,
+    private val googleAuthService: GoogleAuthService
+) {
+    suspend operator fun invoke(context: Context) {
+        // Limpiar tokens del backend
+        authRepository.clearAuthToken()
+        // Limpiar credenciales de Google (Firebase + Credential Manager)
+        googleAuthService.signOut(context)
+    }
+}
+
+
+
+
+================================================================================
+UBICACIÓN: app\src\main\java\com\agentasker\features\login\domain\validators\AuthValidator.kt
+================================================================================
+
+package com.agentasker.features.login.domain.validators
+
+import android.util.Patterns
+
+object AuthValidator {
+
+    fun validateUsername(username: String): Result<Unit> {
+        return when {
+            username.isBlank() -> Result.failure(
+                Exception("El nombre de usuario es requerido")
+            )
+            username.length < 3 -> Result.failure(
+                Exception("El nombre de usuario debe tener al menos 3 caracteres")
+            )
+            else -> Result.success(Unit)
+        }
+    }
+
+    fun validateEmail(email: String): Result<Unit> {
+        return when {
+            email.isBlank() -> Result.failure(
+                Exception("El email es requerido")
+            )
+            !Patterns.EMAIL_ADDRESS.matcher(email).matches() -> Result.failure(
+                Exception("Email inválido")
+            )
+            else -> Result.success(Unit)
+        }
+    }
+
+    fun validatePassword(password: String): Result<Unit> {
+        return when {
+            password.isBlank() -> Result.failure(
+                Exception("La contraseña es requerida")
+            )
+            password.length < 6 -> Result.failure(
+                Exception("La contraseña debe tener al menos 6 caracteres")
+            )
+            else -> Result.success(Unit)
+        }
+    }
+}
+
+
+
+
+================================================================================
+UBICACIÓN: app\src\main\java\com\agentasker\features\login\presentation\components\LoginForms.kt
+================================================================================
+
+package com.agentasker.features.login.presentation.components
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.dp
+import com.agentasker.core.ui.components.PasswordTextField
+
+@Composable
+fun LoginForm(
+    username: String,
+    password: String,
+    onUsernameChange: (String) -> Unit,
+    onPasswordChange: (String) -> Unit,
+    onSubmit: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    isPasswordVisible: Boolean = false,
+    onPasswordVisibilityChange: () -> Unit = {}
+) {
+    val focusManager = LocalFocusManager.current
+
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        OutlinedTextField(
+            value = username,
+            onValueChange = onUsernameChange,
+            label = { Text("Usuario") },
+            placeholder = { Text("Ingresa tu usuario") },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = enabled,
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Text,
+                imeAction = ImeAction.Next
+            ),
+            keyboardActions = KeyboardActions(
+                onNext = { focusManager.moveFocus(FocusDirection.Down) }
+            )
+        )
+
+        PasswordTextField(
+            value = password,
+            onValueChange = onPasswordChange,
+            modifier = Modifier.fillMaxWidth(),
+            enabled = enabled,
+            imeAction = ImeAction.Done,
+            keyboardActions = KeyboardActions(
+                onDone = {
+                    focusManager.clearFocus()
+                    if (username.isNotBlank() && password.isNotBlank()) {
+                        onSubmit()
+                    }
+                }
+            ),
+            isPasswordVisible = isPasswordVisible,
+            onPasswordVisibilityChange = onPasswordVisibilityChange
+        )
+    }
+}
+
+@Composable
+fun RegisterForm(
+    username: String,
+    email: String,
+    password: String,
+    onUsernameChange: (String) -> Unit,
+    onEmailChange: (String) -> Unit,
+    onPasswordChange: (String) -> Unit,
+    onSubmit: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    isPasswordVisible: Boolean = false,
+    onPasswordVisibilityChange: () -> Unit = {}
+) {
+    val focusManager = LocalFocusManager.current
+
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        OutlinedTextField(
+            value = username,
+            onValueChange = onUsernameChange,
+            label = { Text("Usuario") },
+            placeholder = { Text("Ingresa tu usuario") },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = enabled,
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Text,
+                imeAction = ImeAction.Next
+            ),
+            keyboardActions = KeyboardActions(
+                onNext = { focusManager.moveFocus(FocusDirection.Down) }
+            )
+        )
+
+        OutlinedTextField(
+            value = email,
+            onValueChange = onEmailChange,
+            label = { Text("Email") },
+            placeholder = { Text("correo@ejemplo.com") },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = enabled,
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Email,
+                imeAction = ImeAction.Next
+            ),
+            keyboardActions = KeyboardActions(
+                onNext = { focusManager.moveFocus(FocusDirection.Down) }
+            )
+        )
+
+        PasswordTextField(
+            value = password,
+            onValueChange = onPasswordChange,
+            modifier = Modifier.fillMaxWidth(),
+            enabled = enabled,
+            imeAction = ImeAction.Done,
+            keyboardActions = KeyboardActions(
+                onDone = {
+                    focusManager.clearFocus()
+                    if (username.isNotBlank() && email.isNotBlank() && password.isNotBlank()) {
+                        onSubmit()
+                    }
+                }
+            ),
+            isPasswordVisible = isPasswordVisible,
+            onPasswordVisibilityChange = onPasswordVisibilityChange
+        )
+    }
+}
+
+
+
+================================================================================
+UBICACIÓN: app\src\main\java\com\agentasker\features\login\presentation\screens\LoginScreen.kt
+================================================================================
+
+package com.agentasker.features.login.presentation.screens
+
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.agentasker.core.ui.components.GoogleSignInButton
+import com.agentasker.core.ui.components.TextDivider
+import com.agentasker.features.login.presentation.components.LoginForm
+import com.agentasker.features.login.presentation.components.RegisterForm
+import com.agentasker.features.login.presentation.viewmodel.LoginViewModel
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun LoginScreen(
+    viewModel: LoginViewModel,
+    onLoginSuccess: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val context = LocalContext.current
+
+    android.util.Log.d("LoginScreen", "LoginScreen recomposed - isAuthenticated: ${uiState.isAuthenticated}")
+
+    LaunchedEffect(uiState.isAuthenticated) {
+        android.util.Log.d("LoginScreen", "LaunchedEffect - isAuthenticated: ${uiState.isAuthenticated}")
+        if (uiState.isAuthenticated) {
+            android.util.Log.d("LoginScreen", "Llamando a onLoginSuccess()")
+            onLoginSuccess()
+        }
+    }
+
+    LaunchedEffect(uiState.error) {
+        uiState.error?.let { error ->
+            snackbarHostState.showSnackbar(error)
+            viewModel.clearError()
+        }
+    }
+
+    Scaffold(
+        modifier = modifier.fillMaxSize(),
+        snackbarHost = { SnackbarHost(snackbarHostState) }
+    ) { paddingValues ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 32.dp)
+                    .verticalScroll(rememberScrollState()),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Spacer(modifier = Modifier.height(32.dp))
+
+                Text(
+                    text = if (uiState.isRegisterMode) "Crear Cuenta" else "Iniciar Sesión",
+                    style = MaterialTheme.typography.headlineLarge,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+
+                Text(
+                    text = if (uiState.isRegisterMode)
+                        "Regístrate para comenzar a gestionar tus tareas"
+                    else
+                        "Bienvenido de vuelta",
+                    style = MaterialTheme.typography.bodyLarge,
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                if (uiState.isRegisterMode) {
+                    RegisterForm(
+                        username = uiState.username,
+                        email = uiState.email,
+                        password = uiState.password,
+                        onUsernameChange = viewModel::updateUsername,
+                        onEmailChange = viewModel::updateEmail,
+                        onPasswordChange = viewModel::updatePassword,
+                        onSubmit = { viewModel.register(uiState.username, uiState.email, uiState.password) },
+                        enabled = !uiState.isLoading,
+                        isPasswordVisible = uiState.isRegisterPasswordVisible,
+                        onPasswordVisibilityChange = { viewModel.toggleRegisterPasswordVisibility() }
+                    )
+                } else {
+                    LoginForm(
+                        username = uiState.username,
+                        password = uiState.password,
+                        onUsernameChange = viewModel::updateUsername,
+                        onPasswordChange = viewModel::updatePassword,
+                        onSubmit = { viewModel.login(uiState.username, uiState.password) },
+                        enabled = !uiState.isLoading,
+                        isPasswordVisible = uiState.isLoginPasswordVisible,
+                        onPasswordVisibilityChange = { viewModel.toggleLoginPasswordVisibility() }
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Button(
+                    onClick = {
+                        if (uiState.isRegisterMode) {
+                            viewModel.register(uiState.username, uiState.email, uiState.password)
+                        } else {
+                            viewModel.login(uiState.username, uiState.password)
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
+                    enabled = !uiState.isLoading
+                ) {
+                    if (uiState.isLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
+                    } else {
+                        Text(
+                            text = if (uiState.isRegisterMode) "Registrarse" else "Iniciar Sesión",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                TextDivider(text = "O continuar con")
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                GoogleSignInButton(
+                    onClick = {
+                        viewModel.signInWithGoogle(context)
+                    },
+                    enabled = !uiState.isLoading
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Row(
+                    modifier = Modifier.padding(top = 8.dp),
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Text(
+                        text = if (uiState.isRegisterMode)
+                            "¿Ya tienes cuenta? "
+                        else
+                            "¿No tienes cuenta? ",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = if (uiState.isRegisterMode) "Inicia sesión" else "Regístrate",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.clickable(enabled = !uiState.isLoading) {
+                            viewModel.toggleRegisterMode()
+                        }
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(32.dp))
+            }
+        }
+    }
+}
+
+
+
+
+================================================================================
+UBICACIÓN: app\src\main\java\com\agentasker\features\login\presentation\screens\LoginUiState.kt
+================================================================================
+
+package com.agentasker.features.login.presentation.screens
+
+import com.agentasker.features.login.domain.entities.User
+
+data class LoginUiState(
+    val isLoading: Boolean = false,
+    val isAuthenticated: Boolean = false,
+    val currentUser: User? = null,
+    val error: String? = null,
+    val isLoginPasswordVisible: Boolean = false,
+    val isRegisterPasswordVisible: Boolean = false,
+    val isRegisterMode: Boolean = false,
+    val username: String = "",
+    val email: String = "",
+    val password: String = ""
+)
+
+
+
+
+================================================================================
+UBICACIÓN: app\src\main\java\com\agentasker\features\login\presentation\viewmodel\LoginViewModel.kt
+================================================================================
+
+package com.agentasker.features.login.presentation.viewmodel
+
+import android.content.Context
+import androidx.credentials.exceptions.GetCredentialCancellationException
+import androidx.credentials.exceptions.GetCredentialException
+import androidx.credentials.exceptions.NoCredentialException
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.agentasker.features.login.domain.usecases.GetCurrentUserUseCase
+import com.agentasker.features.login.domain.usecases.LoginUseCase
+import com.agentasker.features.login.domain.usecases.RegisterUseCase
+import com.agentasker.features.login.domain.usecases.SignInWithGoogleUseCase
+import com.agentasker.features.login.domain.usecases.SignOutUseCase
+import com.agentasker.features.login.presentation.screens.LoginUiState
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+
+class LoginViewModel(
+    private val loginUseCase: LoginUseCase,
+    private val registerUseCase: RegisterUseCase,
+    private val signOutUseCase: SignOutUseCase,
+    private val signInWithGoogleUseCase: SignInWithGoogleUseCase,
+    private val getCurrentUserUseCase: GetCurrentUserUseCase,
+    private val context: Context
+) : ViewModel() {
+
+    private val _uiState = MutableStateFlow(LoginUiState())
+    val uiState: StateFlow<LoginUiState> = _uiState.asStateFlow()
+
+    init {
+        // Verificar si el usuario ya está autenticado al iniciar
+        android.util.Log.d("LoginViewModel", "init - Verificando estado de autenticación")
+        checkAuthenticationState()
+    }
+
+    private fun checkAuthenticationState() {
+        viewModelScope.launch {
+            try {
+                val user = getCurrentUserUseCase()
+                if (user != null) {
+                    android.util.Log.d("LoginViewModel", "Usuario autenticado encontrado: ${user.email}")
+                    _uiState.value = _uiState.value.copy(
+                        isAuthenticated = true,
+                        currentUser = user
+                    )
+                } else {
+                    android.util.Log.d("LoginViewModel", "No hay usuario autenticado")
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("LoginViewModel", "Error al verificar autenticación", e)
+            }
+        }
+    }
+
+    fun login(username: String, password: String) {
+        _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+
+        viewModelScope.launch {
+            loginUseCase(username, password)
+                .onSuccess { user ->
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        isAuthenticated = true,
+                        currentUser = user,
+                        error = null
+                    )
+                }
+                .onFailure { exception ->
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        error = exception.message ?: "Error al iniciar sesión"
+                    )
+                }
+        }
+    }
+
+    fun signInWithGoogle(context: Context) {
+        _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+
+        viewModelScope.launch {
+            try {
+                android.util.Log.d("LoginViewModel", "Iniciando proceso de Google Sign In")
+
+                signInWithGoogleUseCase(context)
+                    .onSuccess { user ->
+                        android.util.Log.d("LoginViewModel", "Google Sign In exitoso: ${user.email}")
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            isAuthenticated = true,
+                            currentUser = user,
+                            error = null
+                        )
+                        android.util.Log.d("LoginViewModel", "Estado actualizado - isAuthenticated: ${_uiState.value.isAuthenticated}")
+                    }
+                    .onFailure { exception ->
+                        android.util.Log.e("LoginViewModel", "Error en Google Sign In", exception)
+                        val errorMessage = when (exception) {
+                            is GetCredentialCancellationException -> "Inicio de sesión cancelado"
+                            is NoCredentialException -> "No hay cuentas de Google disponibles"
+                            is GetCredentialException -> "Error al obtener credenciales: ${exception.message}"
+                            else -> exception.message ?: "Error al iniciar sesión con Google"
+                        }
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            error = errorMessage
+                        )
+                    }
+            } catch (e: Exception) {
+                android.util.Log.e("LoginViewModel", "Excepción inesperada en signInWithGoogle", e)
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    error = e.message ?: "Error inesperado"
+                )
+            }
+        }
+    }
+
+    fun register(username: String, email: String, password: String) {
+        _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+
+        viewModelScope.launch {
+            registerUseCase(username, email, password)
+                .onSuccess {
+                    login(username, password)
+                }
+                .onFailure { exception ->
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        error = exception.message ?: "Error al registrarse"
+                    )
+                }
+        }
+    }
+
+    fun signOut() {
+        viewModelScope.launch {
+            signOutUseCase(context)
+            _uiState.value = LoginUiState()
+        }
+    }
+
+    fun clearError() {
+        _uiState.value = _uiState.value.copy(error = null)
+    }
+
+    fun toggleLoginPasswordVisibility() {
+        _uiState.value = _uiState.value.copy(
+            isLoginPasswordVisible = !_uiState.value.isLoginPasswordVisible
+        )
+    }
+
+    fun toggleRegisterPasswordVisibility() {
+        _uiState.value = _uiState.value.copy(
+            isRegisterPasswordVisible = !_uiState.value.isRegisterPasswordVisible
+        )
+    }
+
+    fun toggleRegisterMode() {
+        _uiState.value = _uiState.value.copy(
+            isRegisterMode = !_uiState.value.isRegisterMode,
+            username = "",
+            email = "",
+            password = ""
+        )
+    }
+
+    fun updateUsername(username: String) {
+        _uiState.value = _uiState.value.copy(username = username)
+    }
+
+    fun updateEmail(email: String) {
+        _uiState.value = _uiState.value.copy(email = email)
+    }
+
+    fun updatePassword(password: String) {
+        _uiState.value = _uiState.value.copy(password = password)
+    }
+}
+
+
+
+
+================================================================================
+UBICACIÓN: app\src\main\java\com\agentasker\features\login\presentation\viewmodel\LoginViewModelFactory.kt
+================================================================================
+
+package com.agentasker.features.login.presentation.viewmodel
+
+import android.content.Context
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import com.agentasker.features.login.domain.usecases.GetCurrentUserUseCase
+import com.agentasker.features.login.domain.usecases.LoginUseCase
+import com.agentasker.features.login.domain.usecases.RegisterUseCase
+import com.agentasker.features.login.domain.usecases.SignInWithGoogleUseCase
+import com.agentasker.features.login.domain.usecases.SignOutUseCase
+
+class LoginViewModelFactory(
+    private val loginUseCase: LoginUseCase,
+    private val registerUseCase: RegisterUseCase,
+    private val signOutUseCase: SignOutUseCase,
+    private val signInWithGoogleUseCase: SignInWithGoogleUseCase,
+    private val getCurrentUserUseCase: GetCurrentUserUseCase,
+    private val context: Context
+) : ViewModelProvider.Factory {
+
+    @Suppress("UNCHECKED_CAST")
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(LoginViewModel::class.java)) {
+            return LoginViewModel(
+                loginUseCase = loginUseCase,
+                registerUseCase = registerUseCase,
+                signOutUseCase = signOutUseCase,
+                signInWithGoogleUseCase = signInWithGoogleUseCase,
+                getCurrentUserUseCase = getCurrentUserUseCase,
+                context = context
+            ) as T
+        }
+        throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
+    }
+}
+
+
+
+
+================================================================================
+UBICACIÓN: app\src\main\java\com\agentasker\features\tasks\data\datasources\remote\mapper\TaskMapper.kt
+================================================================================
+
+package com.agentasker.features.tasks.data.datasources.remote.mapper
+
+import com.agentasker.features.tasks.data.datasources.remote.model.TaskDTO
+import com.agentasker.features.tasks.data.datasources.remote.model.TaskResponse
+import com.agentasker.features.tasks.domain.entities.Task
+
+fun TaskDTO.toDomain(): Task {
+    return Task(
+        id = id.toString(),
+        title = title,
+        description = description,
+        priority = priority,
+        createdAt = createdAt,
+        updatedAt = updatedAt
+    )
+}
+
+fun TaskResponse.toDomain(): List<Task> {
+    return this.map { it.toDomain() }
+}
+
+
+
+
+================================================================================
+UBICACIÓN: app\src\main\java\com\agentasker\features\tasks\data\datasources\remote\model\TaskDTO.kt
+================================================================================
+
+package com.agentasker.features.tasks.data.datasources.remote.model
+
+import com.google.gson.annotations.SerializedName
+
+typealias TaskResponse = List<TaskDTO>
+
+data class TaskDTO(
+    @SerializedName("id")
+    val id: Int,
+    @SerializedName("title")
+    val title: String,
+    @SerializedName("description")
+    val description: String,
+    @SerializedName("priority")
+    val priority: String,
+    @SerializedName("createdAt")
+    val createdAt: String?,
+    @SerializedName("updatedAt")
+    val updatedAt: String?
+)
+
+data class CreateTaskRequest(
+    @SerializedName("title")
+    val title: String,
+    @SerializedName("description")
+    val description: String,
+    @SerializedName("priority")
+    val priority: String = "medium"
+)
+
+data class UpdateTaskRequest(
+    @SerializedName("title")
+    val title: String?,
+    @SerializedName("description")
+    val description: String?,
+    @SerializedName("priority")
+    val priority: String?
+)
+
+data class SubtaskDTO(
+    @SerializedName("id")
+    val id: String?,
+    @SerializedName("title")
+    val title: String,
+    @SerializedName("isCompleted")
+    val isCompleted: Boolean?
+)
+
+
+
+
+================================================================================
+UBICACIÓN: app\src\main\java\com\agentasker\features\tasks\data\repositories\TaskRepositoryImpl.kt
+================================================================================
+
+package com.agentasker.features.tasks.data.repositories
+
+import com.agentasker.core.network.AgentTaskerApi
+import com.agentasker.features.tasks.data.datasources.remote.mapper.toDomain
+import com.agentasker.features.tasks.data.datasources.remote.model.CreateTaskRequest
+import com.agentasker.features.tasks.data.datasources.remote.model.UpdateTaskRequest
+import com.agentasker.features.tasks.domain.entities.Task
+import com.agentasker.features.tasks.domain.repositories.TaskRepository
+
+class TaskRepositoryImpl(
+    private val api: AgentTaskerApi
+) : TaskRepository {
+
+    override suspend fun getTasks(): List<Task> {
+        val response = api.getTasks()
+        return response.toDomain()
+    }
+
+    override suspend fun getTaskById(id: String): Task {
+        val response = api.getTaskById(id.toInt())
+        return response.toDomain()
+    }
+
+    override suspend fun createTask(title: String, description: String, priority: String): Task {
+        val request = CreateTaskRequest(
+            title = title,
+            description = description,
+            priority = priority
+        )
+        val response = api.createTask(request)
+        return response.toDomain()
+    }
+
+    override suspend fun updateTask(
+        id: String,
+        title: String?,
+        description: String?,
+        priority: String?
+    ): Task {
+        val request = UpdateTaskRequest(
+            title = title,
+            description = description,
+            priority = priority
+        )
+        val response = api.updateTask(id.toInt(), request)
+        return response.toDomain()
+    }
+
+    override suspend fun deleteTask(id: String) {
+        api.deleteTask(id.toInt())
+    }
+}
+
+
+
+
+================================================================================
+UBICACIÓN: app\src\main\java\com\agentasker\features\tasks\di\TasksModule.kt
+================================================================================
+
+package com.agentasker.features.tasks.di
+
+import com.agentasker.core.di.AppContainer
+import com.agentasker.features.tasks.domain.usecases.CreateTaskUseCase
+import com.agentasker.features.tasks.domain.usecases.DeleteTaskUseCase
+import com.agentasker.features.tasks.domain.usecases.GetTasksUseCase
+import com.agentasker.features.tasks.domain.usecases.UpdateTaskUseCase
+import com.agentasker.features.tasks.presentation.viewmodel.TaskViewModelFactory
+
+class TasksModule(
+    private val appContainer: AppContainer
+) {
+
+    private fun provideGetTasksUseCase(): GetTasksUseCase {
+        return GetTasksUseCase(appContainer.taskRepository)
+    }
+
+    private fun provideCreateTaskUseCase(): CreateTaskUseCase {
+        return CreateTaskUseCase(appContainer.taskRepository)
+    }
+
+    private fun provideUpdateTaskUseCase(): UpdateTaskUseCase {
+        return UpdateTaskUseCase(appContainer.taskRepository)
+    }
+
+    private fun provideDeleteTaskUseCase(): DeleteTaskUseCase {
+        return DeleteTaskUseCase(appContainer.taskRepository)
+    }
+
+    fun provideTaskViewModelFactory(): TaskViewModelFactory {
+        return TaskViewModelFactory(
+            getTasksUseCase = provideGetTasksUseCase(),
+            createTaskUseCase = provideCreateTaskUseCase(),
+            updateTaskUseCase = provideUpdateTaskUseCase(),
+            deleteTaskUseCase = provideDeleteTaskUseCase()
+        )
+    }
+}
+
+
+
+
+================================================================================
+UBICACIÓN: app\src\main\java\com\agentasker\features\tasks\domain\entities\Task.kt
+================================================================================
+
+package com.agentasker.features.tasks.domain.entities
+
+data class Task(
+    val id: String,
+    val title: String,
+    val description: String,
+    val priority: String,
+    val createdAt: String? = null,
+    val updatedAt: String? = null
+)
+
+
+
+
+================================================================================
+UBICACIÓN: app\src\main\java\com\agentasker\features\tasks\domain\repositories\TaskRepository.kt
+================================================================================
+
+package com.agentasker.features.tasks.domain.repositories
+
+import com.agentasker.features.tasks.domain.entities.Task
+
+interface TaskRepository {
+    suspend fun getTasks(): List<Task>
+    suspend fun getTaskById(id: String): Task
+    suspend fun createTask(title: String, description: String, priority: String): Task
+    suspend fun updateTask(id: String, title: String?, description: String?, priority: String?): Task
+    suspend fun deleteTask(id: String)
+}
+
+
+
+
+================================================================================
+UBICACIÓN: app\src\main\java\com\agentasker\features\tasks\domain\usecases\CreateTaskUseCase.kt
+================================================================================
+
+package com.agentasker.features.tasks.domain.usecases
+
+import com.agentasker.features.tasks.domain.entities.Task
+import com.agentasker.features.tasks.domain.repositories.TaskRepository
+
+class CreateTaskUseCase(
+    private val taskRepository: TaskRepository
+) {
+    suspend operator fun invoke(title: String, description: String, priority: String): Result<Task> {
+        return try {
+            val task = taskRepository.createTask(title, description, priority)
+            Result.success(task)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+}
+
+
+
+================================================================================
+UBICACIÓN: app\src\main\java\com\agentasker\features\tasks\domain\usecases\DeleteTaskUseCase.kt
+================================================================================
+
+package com.agentasker.features.tasks.domain.usecases
+
+import com.agentasker.features.tasks.domain.repositories.TaskRepository
+
+class DeleteTaskUseCase(
+    private val taskRepository: TaskRepository
+) {
+    suspend operator fun invoke(id: String): Result<Unit> {
+        return try {
+            taskRepository.deleteTask(id)
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+}
+
+
+
+
+================================================================================
+UBICACIÓN: app\src\main\java\com\agentasker\features\tasks\domain\usecases\GetTasksUseCase.kt
+================================================================================
+
+package com.agentasker.features.tasks.domain.usecases
+
+import com.agentasker.features.tasks.domain.entities.Task
+import com.agentasker.features.tasks.domain.repositories.TaskRepository
+
+class GetTasksUseCase(
+    private val repository: TaskRepository
+) {
+
+    suspend operator fun invoke(): Result<List<Task>> {
+        return try {
+            val tasks = repository.getTasks()
+
+            val filteredTasks = tasks.filter { it.title.isNotBlank() }
+
+            if (filteredTasks.isEmpty()) {
+                Result.failure(Exception("No se encontraron tareas válidas"))
+            } else {
+                Result.success(filteredTasks)
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+}
+
+
+
+
+================================================================================
+UBICACIÓN: app\src\main\java\com\agentasker\features\tasks\domain\usecases\UpdateTaskUseCase.kt
+================================================================================
+
+package com.agentasker.features.tasks.domain.usecases
+
+import com.agentasker.features.tasks.domain.entities.Task
+import com.agentasker.features.tasks.domain.repositories.TaskRepository
+
+class UpdateTaskUseCase(
+    private val taskRepository: TaskRepository
+) {
+    suspend operator fun invoke(
+        id: String,
+        title: String?,
+        description: String?,
+        priority: String?
+    ): Result<Task> {
+        return try {
+            val task = taskRepository.updateTask(id, title, description, priority)
+            Result.success(task)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+}
+
+
+
+
+================================================================================
+UBICACIÓN: app\src\main\java\com\agentasker\features\tasks\presentation\components\TaskCard.kt
+================================================================================
+
+package com.agentasker.features.tasks.presentation.components
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import com.agentasker.core.ui.components.PriorityBadge
+import com.agentasker.features.tasks.domain.entities.Task
+
+@Composable
+fun TaskCard(
+    task: Task,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = task.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    PriorityBadge(priority = task.priority)
+                }
+
+                Row {
+                    IconButton(onClick = onEdit) {
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = "Editar tarea",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+                    IconButton(onClick = onDelete) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "Eliminar tarea",
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+            }
+
+            if (task.description.isNotBlank()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = task.description,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            task.createdAt?.let { createdAt ->
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Creada: $createdAt",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.Gray
+                )
+            }
+        }
+    }
+}
+
+
+
+
+================================================================================
+UBICACIÓN: app\src\main\java\com\agentasker\features\tasks\presentation\screens\TaskFormDialog.kt
+================================================================================
+
+package com.agentasker.features.tasks.presentation.screens
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import com.agentasker.R
+import com.agentasker.core.ui.components.PrioritySelector
+import com.agentasker.features.tasks.domain.entities.Task
+
+@Composable
+fun TaskFormDialog(
+    task: Task? = null,
+    title: String,
+    description: String,
+    priority: String,
+    onTitleChange: (String) -> Unit,
+    onDescriptionChange: (String) -> Unit,
+    onPriorityChange: (String) -> Unit,
+    onDismiss: () -> Unit,
+    onSave: (title: String, description: String, priority: String) -> Unit
+) {
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = if (task == null) stringResource(R.string.task_new_title) else stringResource(R.string.task_edit_title),
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = onTitleChange,
+                    label = { Text(stringResource(R.string.task_field_title)) },
+                    placeholder = { Text(stringResource(R.string.task_field_title_placeholder)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    isError = title.isBlank()
+                )
+
+                OutlinedTextField(
+                    value = description,
+                    onValueChange = onDescriptionChange,
+                    label = { Text(stringResource(R.string.task_field_description)) },
+                    placeholder = { Text(stringResource(R.string.task_field_description_placeholder)) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(120.dp),
+                    maxLines = 5
+                )
+
+                var isPrioritySelectorExpanded by remember { mutableStateOf(false) }
+
+                PrioritySelector(
+                    selectedPriority = priority,
+                    onPriorityChange = onPriorityChange,
+                    expanded = isPrioritySelectorExpanded,
+                    onExpandedChange = { isPrioritySelectorExpanded = it },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (title.isNotBlank()) {
+                        onSave(title, description, priority)
+                        onDismiss()
+                    }
+                },
+                enabled = title.isNotBlank()
+            ) {
+                Text(if (task == null) stringResource(R.string.task_button_create) else stringResource(R.string.task_button_save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.task_button_cancel))
+            }
+        }
+    )
+}
+
+
+
+
+================================================================================
+UBICACIÓN: app\src\main\java\com\agentasker\features\tasks\presentation\screens\TaskScreen.kt
+================================================================================
+
+package com.agentasker.features.tasks.presentation.screens
+
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.outlined.TaskAlt
+import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.agentasker.core.ui.components.EmptyState
+import com.agentasker.core.ui.components.LoadingState
+import com.agentasker.features.tasks.presentation.components.TaskCard
+import com.agentasker.features.tasks.presentation.viewmodel.TaskViewModel
+import com.agentasker.features.tasks.presentation.viewmodel.TaskViewModelFactory
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TaskScreen(
+    factory: TaskViewModelFactory
+) {
+    val viewModel: TaskViewModel = viewModel(factory = factory)
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+
+    LaunchedEffect(uiState.error) {
+        uiState.error?.let { error ->
+            snackbarHostState.showSnackbar(error)
+            viewModel.clearError()
+        }
+    }
+
+    if (uiState.showDialog) {
+        TaskFormDialog(
+            task = uiState.taskToEdit,
+            title = uiState.formTitle,
+            description = uiState.formDescription,
+            priority = uiState.formPriority,
+            onTitleChange = viewModel::updateFormTitle,
+            onDescriptionChange = viewModel::updateFormDescription,
+            onPriorityChange = viewModel::updateFormPriority,
+            onDismiss = {
+                viewModel.hideDialog()
+            },
+            onSave = { title, description, priority ->
+                if (uiState.taskToEdit != null) {
+                    viewModel.updateTask(uiState.taskToEdit!!.id, title, description, priority)
+                } else {
+                    viewModel.createTask(title, description, priority)
+                }
+                viewModel.hideDialog()
+            }
+        )
+    }
+
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        topBar = {
+            CenterAlignedTopAppBar(
+                title = { Text("Mis Tareas", fontWeight = FontWeight.ExtraBold) }
+            )
+        },
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = {
+                    viewModel.showCreateDialog()
+                }
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "Crear tarea"
+                )
+            }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
+    ) { innerPadding ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+        ) {
+            when {
+                uiState.isLoading && uiState.tasks.isEmpty() -> {
+                    LoadingState()
+                }
+                uiState.tasks.isEmpty() && !uiState.isLoading -> {
+                    EmptyState(
+                        message = "No hay tareas.\n¡Crea una nueva!",
+                        icon = Icons.Outlined.TaskAlt
+                    )
+                }
+                else -> {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(8.dp)
+                    ) {
+                        items(
+                            items = uiState.tasks,
+                            key = { it.id }
+                        ) { task ->
+                            TaskCard(
+                                task = task,
+                                onEdit = {
+                                    viewModel.showEditDialog(task)
+                                },
+                                onDelete = {
+                                    viewModel.deleteTask(task.id)
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+
+
+================================================================================
+UBICACIÓN: app\src\main\java\com\agentasker\features\tasks\presentation\screens\TaskUiState.kt
+================================================================================
+
+package com.agentasker.features.tasks.presentation.screens
+
+import com.agentasker.features.tasks.domain.entities.Task
+
+data class TaskUiState(
+    val isLoading: Boolean = false,
+    val tasks: List<Task> = emptyList(),
+    val error: String? = null,
+    val showDialog: Boolean = false,
+    val taskToEdit: Task? = null,
+    val formTitle: String = "",
+    val formDescription: String = "",
+    val formPriority: String = "medium"
+)
+
+
+
+
+================================================================================
+UBICACIÓN: app\src\main\java\com\agentasker\features\tasks\presentation\viewmodel\TaskViewModel.kt
+================================================================================
+
+package com.agentasker.features.tasks.presentation.viewmodel
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.agentasker.features.tasks.domain.entities.Task
+import com.agentasker.features.tasks.domain.usecases.CreateTaskUseCase
+import com.agentasker.features.tasks.domain.usecases.DeleteTaskUseCase
+import com.agentasker.features.tasks.domain.usecases.GetTasksUseCase
+import com.agentasker.features.tasks.domain.usecases.UpdateTaskUseCase
+import com.agentasker.features.tasks.presentation.screens.TaskUiState
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+
+class TaskViewModel(
+    private val getTasksUseCase: GetTasksUseCase,
+    private val createTaskUseCase: CreateTaskUseCase,
+    private val updateTaskUseCase: UpdateTaskUseCase,
+    private val deleteTaskUseCase: DeleteTaskUseCase
+) : ViewModel() {
+
+    private val _uiState = MutableStateFlow(TaskUiState())
+    val uiState: StateFlow<TaskUiState> = _uiState.asStateFlow()
+
+    init {
+        loadTasks()
+    }
+
+    fun loadTasks() {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+
+            getTasksUseCase().fold(
+                onSuccess = { tasks ->
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        tasks = tasks,
+                        error = null
+                    )
+                },
+                onFailure = { exception ->
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        error = exception.message ?: "Error al cargar las tareas"
+                    )
+                }
+            )
+        }
+    }
+
+    fun createTask(title: String, description: String, priority: String) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+
+            createTaskUseCase(title, description, priority).fold(
+                onSuccess = {
+                    loadTasks()
+                },
+                onFailure = { exception ->
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        error = exception.message ?: "Error al crear la tarea"
+                    )
+                }
+            )
+        }
+    }
+
+    fun updateTask(id: String, title: String?, description: String?, priority: String?) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+
+
+            val currentTasks = _uiState.value.tasks
+            val updatedTasks = currentTasks.map { task ->
+                if (task.id == id) {
+                    task.copy(
+                        title = title ?: task.title,
+                        description = description ?: task.description,
+                        priority = priority ?: task.priority
+                    )
+                } else {
+                    task
+                }
+            }
+            _uiState.value = _uiState.value.copy(
+                tasks = updatedTasks,
+                isLoading = false
+            )
+
+            updateTaskUseCase(id, title, description, priority).fold(
+                onSuccess = {
+
+                    loadTasks()
+                },
+                onFailure = { exception ->
+
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        tasks = currentTasks,
+                        error = exception.message ?: "Error al actualizar la tarea"
+                    )
+                }
+            )
+        }
+    }
+
+    fun deleteTask(id: String) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(error = null)
+
+
+            val currentTasks = _uiState.value.tasks
+            _uiState.value = _uiState.value.copy(
+                tasks = currentTasks.filter { it.id != id }
+            )
+
+            deleteTaskUseCase(id).fold(
+                onSuccess = {
+
+                    loadTasks()
+                },
+                onFailure = { exception ->
+
+                    _uiState.value = _uiState.value.copy(
+                        tasks = currentTasks,
+                        error = exception.message ?: "Error al eliminar la tarea"
+                    )
+                }
+            )
+        }
+    }
+
+    fun clearError() {
+        _uiState.value = _uiState.value.copy(error = null)
+    }
+
+    fun showCreateDialog() {
+        _uiState.value = _uiState.value.copy(
+            showDialog = true,
+            taskToEdit = null,
+            formTitle = "",
+            formDescription = "",
+            formPriority = "medium"
+        )
+    }
+
+    fun showEditDialog(task: Task) {
+        _uiState.value = _uiState.value.copy(
+            showDialog = true,
+            taskToEdit = task,
+            formTitle = task.title,
+            formDescription = task.description,
+            formPriority = task.priority
+        )
+    }
+
+    fun hideDialog() {
+        _uiState.value = _uiState.value.copy(
+            showDialog = false,
+            taskToEdit = null,
+            formTitle = "",
+            formDescription = "",
+            formPriority = "medium"
+        )
+    }
+
+    fun updateFormTitle(title: String) {
+        _uiState.value = _uiState.value.copy(formTitle = title)
+    }
+
+    fun updateFormDescription(description: String) {
+        _uiState.value = _uiState.value.copy(formDescription = description)
+    }
+
+    fun updateFormPriority(priority: String) {
+        _uiState.value = _uiState.value.copy(formPriority = priority)
+    }
+}
+
+
+
+
+================================================================================
+UBICACIÓN: app\src\main\java\com\agentasker\features\tasks\presentation\viewmodel\TaskViewModelFactory.kt
+================================================================================
+
+package com.agentasker.features.tasks.presentation.viewmodel
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import com.agentasker.features.tasks.domain.usecases.CreateTaskUseCase
+import com.agentasker.features.tasks.domain.usecases.DeleteTaskUseCase
+import com.agentasker.features.tasks.domain.usecases.GetTasksUseCase
+import com.agentasker.features.tasks.domain.usecases.UpdateTaskUseCase
+
+class TaskViewModelFactory(
+    private val getTasksUseCase: GetTasksUseCase,
+    private val createTaskUseCase: CreateTaskUseCase,
+    private val updateTaskUseCase: UpdateTaskUseCase,
+    private val deleteTaskUseCase: DeleteTaskUseCase
+) : ViewModelProvider.Factory {
+
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(TaskViewModel::class.java)) {
+            @Suppress("UNCHECKED_CAST")
+            return TaskViewModel(
+                getTasksUseCase,
+                createTaskUseCase,
+                updateTaskUseCase,
+                deleteTaskUseCase
+            ) as T
+        }
+        throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
+    }
+}
+
+
+
+
+================================================================================
+UBICACIÓN: app\src\main\res\drawable\ic_launcher_background.xml
+================================================================================
+
+<?xml version="1.0" encoding="utf-8"?>
+<vector
+    android:height="108dp"
+    android:width="108dp"
+    android:viewportHeight="108"
+    android:viewportWidth="108"
+    xmlns:android="http://schemas.android.com/apk/res/android">
+    <path android:fillColor="#3DDC84"
+          android:pathData="M0,0h108v108h-108z"/>
+    <path android:fillColor="#00000000" android:pathData="M9,0L9,108"
+          android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
+    <path android:fillColor="#00000000" android:pathData="M19,0L19,108"
+          android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
+    <path android:fillColor="#00000000" android:pathData="M29,0L29,108"
+          android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
+    <path android:fillColor="#00000000" android:pathData="M39,0L39,108"
+          android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
+    <path android:fillColor="#00000000" android:pathData="M49,0L49,108"
+          android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
+    <path android:fillColor="#00000000" android:pathData="M59,0L59,108"
+          android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
+    <path android:fillColor="#00000000" android:pathData="M69,0L69,108"
+          android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
+    <path android:fillColor="#00000000" android:pathData="M79,0L79,108"
+          android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
+    <path android:fillColor="#00000000" android:pathData="M89,0L89,108"
+          android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
+    <path android:fillColor="#00000000" android:pathData="M99,0L99,108"
+          android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
+    <path android:fillColor="#00000000" android:pathData="M0,9L108,9"
+          android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
+    <path android:fillColor="#00000000" android:pathData="M0,19L108,19"
+          android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
+    <path android:fillColor="#00000000" android:pathData="M0,29L108,29"
+          android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
+    <path android:fillColor="#00000000" android:pathData="M0,39L108,39"
+          android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
+    <path android:fillColor="#00000000" android:pathData="M0,49L108,49"
+          android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
+    <path android:fillColor="#00000000" android:pathData="M0,59L108,59"
+          android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
+    <path android:fillColor="#00000000" android:pathData="M0,69L108,69"
+          android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
+    <path android:fillColor="#00000000" android:pathData="M0,79L108,79"
+          android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
+    <path android:fillColor="#00000000" android:pathData="M0,89L108,89"
+          android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
+    <path android:fillColor="#00000000" android:pathData="M0,99L108,99"
+          android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
+    <path android:fillColor="#00000000" android:pathData="M19,29L89,29"
+          android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
+    <path android:fillColor="#00000000" android:pathData="M19,39L89,39"
+          android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
+    <path android:fillColor="#00000000" android:pathData="M19,49L89,49"
+          android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
+    <path android:fillColor="#00000000" android:pathData="M19,59L89,59"
+          android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
+    <path android:fillColor="#00000000" android:pathData="M19,69L89,69"
+          android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
+    <path android:fillColor="#00000000" android:pathData="M19,79L89,79"
+          android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
+    <path android:fillColor="#00000000" android:pathData="M29,19L29,89"
+          android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
+    <path android:fillColor="#00000000" android:pathData="M39,19L39,89"
+          android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
+    <path android:fillColor="#00000000" android:pathData="M49,19L49,89"
+          android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
+    <path android:fillColor="#00000000" android:pathData="M59,19L59,89"
+          android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
+    <path android:fillColor="#00000000" android:pathData="M69,19L69,89"
+          android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
+    <path android:fillColor="#00000000" android:pathData="M79,19L79,89"
+          android:strokeColor="#33FFFFFF" android:strokeWidth="0.8"/>
+</vector>
+
+
+
+================================================================================
+UBICACIÓN: app\src\main\res\drawable\ic_launcher_foreground.xml
+================================================================================
+
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="1024"
+    android:viewportHeight="1024">
+  <path
+      android:pathData="M312.7,279.8c-1.5,1.7 -1.7,6.1 -1.7,43.3 0,35.9 0.2,41.8 1.6,43.7 1.5,2.2 1.5,2.2 35,2.2 21.2,-0 34.2,-0.4 35.5,-1 1.8,-1 1.9,-2.6 1.9,-44.5 0,-41.9 -0.1,-43.5 -1.9,-44.5 -1.3,-0.6 -14.3,-1 -35.4,-1 -31.1,-0 -33.5,0.1 -35,1.8zM340,297.8c0,2.5 -10.3,12.4 -12.1,11.7 -0.8,-0.4 -2.5,-2 -3.8,-3.6 -3.1,-3.9 -1.5,-6.1 2.5,-3.4 2.7,1.7 2.7,1.7 6.8,-2.4 4.4,-4.4 6.6,-5.2 6.6,-2.3zM373.5,303.5c0,1.9 -0.8,2 -13.7,2.3l-13.8,0.3 0,-2.6 0,-2.6 13.8,0.3c12.9,0.3 13.7,0.4 13.7,2.3zM340,318.7c0,1.8 -9.7,12.3 -11.4,12.3 -1.5,-0 -6.6,-5.2 -6.6,-6.6 0,-2.3 2.1,-2.6 4.1,-0.8 1.9,1.7 2.1,1.7 6.2,-2.4 4.3,-4.4 7.7,-5.5 7.7,-2.5zM373.5,324.5c0,1.9 -0.8,2 -13.4,2.3 -13.6,0.3 -15.6,-0.2 -14.4,-3.5 0.4,-1.1 3.4,-1.3 14.2,-1.1 12.8,0.3 13.6,0.4 13.6,2.3zM339.7,339.7c0.5,1.4 -9.4,12.3 -11,12.3 -1.5,-0 -6.7,-5.1 -6.7,-6.6 0,-2.3 1.7,-2.4 4.3,-0.4l2.5,2 3.7,-4.6c3.6,-4.3 6.4,-5.3 7.2,-2.7zM373.5,345.5c0,1.9 -0.8,2 -13.7,2.3 -12.9,0.2 -13.8,0.1 -13.8,-1.6 0,-1 0.3,-2.2 0.7,-2.6 0.4,-0.3 6.6,-0.5 13.7,-0.4 12.3,0.3 13.1,0.4 13.1,2.3z"
+      android:fillColor="#000000"
+      android:strokeColor="#00000000"/>
+  <path
+      android:pathData="M654.4,279.3c-0.3,0.8 -0.4,4.5 -0.2,8.3 0.3,6.6 0.4,6.9 2.8,6.9 2.5,-0 2.5,-0.1 2.5,-8 0,-7.5 -0.1,-8 -2.3,-8.3 -1.2,-0.2 -2.4,0.3 -2.8,1.1z"
+      android:fillColor="#000000"
+      android:strokeColor="#00000000"/>
+  <path
+      android:pathData="M698.2,279.2c-1.8,1.8 -1.6,13.3 0.4,14.9 2.8,2.3 4.9,-0.1 5.2,-6.4 0.4,-8 -2.2,-11.9 -5.6,-8.5z"
+      android:fillColor="#000000"
+      android:strokeColor="#00000000"/>
+  <path
+      android:pathData="M637.2,289.3c-2.2,2.3 -2.2,2.7 -2.2,38.6l0,36.2 2.5,2.5 2.5,2.5 39.6,-0.3c37.8,-0.3 39.6,-0.4 41,-2.2 1.1,-1.6 1.4,-8.6 1.4,-38.8 0,-36.5 0,-36.7 -2.2,-38.8 -1.6,-1.4 -3.5,-2 -7,-2l-4.8,-0 0,4c0,11.1 -13.8,11.9 -15,0.9l-0.5,-4.4 -13.6,-0.3 -13.7,-0.3 -0.6,4.5c-0.7,4.5 -4.1,8.6 -7.2,8.6 -4.7,-0 -8.4,-4.4 -8.4,-10 0,-2.9 -0.1,-3 -4.8,-3 -3.8,-0 -5.3,0.5 -7,2.3z"
+      android:fillColor="#000000"
+      android:strokeColor="#00000000"/>
+  <path
+      android:pathData="M433.5,320.5c-3.4,3.3 -3.4,8.3 0,11.5l2.5,2.3 0,20.3c0,18 -0.2,20.7 -2,24.5 -2.6,5.8 -2.9,23.3 -0.4,28.2 2.7,5.3 8.8,10.7 12.1,10.7 0.4,-0 0.7,-11.3 0.5,-25.1 -0.3,-24.4 -0.3,-25 -2.2,-24.4 -1.9,0.6 -2,0.1 -2,-16.2l0,-16.8 3,-2.8c5.9,-5.6 2.5,-14.7 -5.5,-14.7 -2.5,-0 -4.4,0.8 -6,2.5z"
+      android:fillColor="#000000"
+      android:strokeColor="#00000000"/>
+  <path
+      android:pathData="M581.2,318.7c-1.6,0.6 -4.2,5.6 -4.2,8.2 0,1.1 1.4,3.6 3,5.4l3,3.5 0,16.6c0,16.3 -0.1,16.7 -2,16.1 -2,-0.6 -2,-0.2 -2,24.4 0,28 -0.2,27.2 6.7,22.2 6.3,-4.6 7.8,-8.7 7.8,-21.6 0,-9.6 -0.3,-11.5 -2.2,-14.8 -2.2,-3.6 -2.3,-4.9 -2.3,-23.5l0,-19.6 2.7,-2.8c5.5,-5.8 2,-14.9 -5.6,-14.7 -2,-0 -4.2,0.3 -4.9,0.6z"
+      android:fillColor="#000000"
+      android:strokeColor="#00000000"/>
+  <path
+      android:pathData="M499.5,323c-16.6,3.4 -33.4,15.6 -40.9,30 -5.8,11 -6.6,15.4 -6.6,34.4 0,15 0.3,17.9 2.3,23.7 5.1,14.9 15.6,26.8 30.1,34 33.5,16.5 74.4,0.7 86.7,-33.7 2.7,-7.4 3.8,-31.9 2,-41.7 -4.1,-21.5 -23.2,-41 -45.2,-46.2 -6.8,-1.6 -21.7,-1.8 -28.4,-0.5zM505.9,342.6c3.1,2.5 3.1,2.7 3.1,12l0,9.4 -4.8,-0c-5.5,-0 -10.7,2.5 -12.9,6.2 -3.5,5.6 1.4,7.9 5.9,2.7 2.4,-2.6 3.3,-3 7,-2.7l4.3,0.3 0.3,12.7c0.3,12.7 0.3,12.7 -2.6,15.8 -2.1,2.5 -3.8,3.3 -7.4,3.7 -4.2,0.5 -4.9,0.2 -8.5,-3.1 -3.1,-2.8 -4.9,-3.6 -7.8,-3.6 -5.4,-0 -10.5,-5.2 -10.5,-10.9 0,-2.3 -0.9,-5.8 -2,-7.8 -1.1,-2.1 -2,-4.8 -2,-6.1 0,-3.6 2.7,-8 6,-9.7 2.2,-1.1 3,-2.3 3,-4.1 0,-5.1 4.9,-10.4 9.7,-10.4 0.8,-0 3.3,-1.6 5.4,-3.5 4.9,-4.4 9.3,-4.7 13.8,-0.9zM531,341.5c1.6,0.8 3.4,2.4 4,3.5 0.6,1.2 2.1,2 3.6,2 3.6,-0 9.4,5.9 9.4,9.6 0,1.9 1.1,3.7 4,6.1 5.2,4.5 6.2,9.2 3.2,14.5 -1.3,2.1 -2.2,5.4 -2.2,7.8 0,5.5 -3.7,9.4 -9.9,10.4 -3,0.4 -5.7,1.8 -8.3,4.1 -5.3,4.9 -10.6,4.9 -15.4,0.1l-3.4,-3.4 0,-10.6c0,-5.8 0.4,-10.6 0.9,-10.6 1.6,-0 7,5 7.6,7.1 0.9,2.6 4.9,2.2 5.3,-0.6 0.4,-3.3 -3.5,-8.3 -8.8,-11.2l-5,-2.8 0,-10.8c0,-10.7 0.1,-10.9 2.9,-13.8 3.4,-3.3 7.5,-3.8 12.1,-1.4zM526.8,429.9c0.8,0.5 1.2,1.7 1,2.7 -0.3,1.7 -1.6,1.9 -14.9,2.2 -12.9,0.2 -14.7,0.1 -15.3,-1.4 -1.4,-3.7 1.1,-4.4 14.8,-4.4 7.2,-0 13.7,0.4 14.4,0.9z"
+      android:fillColor="#000000"
+      android:strokeColor="#00000000"/>
+  <path
+      android:pathData="M327,376c0,2.9 7,8.4 16.4,12.9 5.6,2.7 10.7,5.5 11.3,6.2 0.6,0.8 4.8,12.6 9.4,26.4 6.8,20.7 8.3,26.2 8.4,31.7 0,5.1 0.5,7.2 2,8.9 2.7,3 7.8,5 11.2,4.3 2.4,-0.5 29.4,8 52.9,16.6 3,1.1 3.1,1.3 2.4,4.7 -0.5,2 -1.3,3.9 -1.9,4.2 -0.5,0.4 -14.7,5.1 -31.4,10.5 -20.8,6.7 -31.2,9.7 -32.8,9.2 -1.5,-0.4 -4.4,-3.6 -7.9,-8.8 -3,-4.6 -11.4,-16.6 -18.7,-26.8 -10.9,-15.2 -13.3,-19.3 -13.8,-23 -2.2,-16.1 -4.5,-20.2 -16.4,-28.8 -5.8,-4.1 -8.1,-5.2 -11.1,-5.2 -4.3,-0 -7,0.8 -7,2 0,0.5 3.8,3.8 8.5,7.4 4.6,3.7 9.1,7.6 10,8.8 2.2,3.3 1.8,7.2 -1,10.6 -3.4,4 -7.3,5.3 -11.1,3.7 -3.2,-1.4 -10.6,-8.1 -14.7,-13.5 -2.3,-2.9 -2.9,-3.2 -3.7,-2 -3.9,5.8 -0.8,12.6 9.1,20.6 5.7,4.7 19.9,12.4 22.7,12.4 0.8,-0 8.2,10.2 32.6,44.9 4.2,6.1 6.6,10.4 6.6,12.2 0,3.8 4.4,8.7 8.6,9.5 4.4,0.8 7.6,-0 11.1,-2.9 1.8,-1.6 13.1,-5.6 31.9,-11.5 16,-5.1 29.4,-9.2 29.6,-9.2 0.3,-0 0.8,8.4 1.2,18.7 0.4,10.4 1.1,26 1.6,34.8l1,15.9 -5.4,11.6c-2.9,6.3 -19.6,42.3 -37.1,80 -17.5,37.7 -32.6,70.4 -33.6,72.7l-1.8,4.3 13.3,-0 13.3,-0 9.5,-20.8c5.3,-11.4 21,-45.2 34.8,-75.2 37.7,-81.5 55.7,-120.6 59.3,-128.9 5.8,-13.6 13,-17.7 22.5,-12.9 4,1.9 5.2,3.3 7.9,8.8 2.9,5.9 17.1,36.6 59.8,129.5 8.1,17.6 21.7,47.2 30.2,65.7l15.5,33.8 13.4,-0c7.4,-0 13.4,-0.2 13.4,-0.4 0,-0.2 -4.7,-10.4 -10.4,-22.7 -5.7,-12.3 -23.1,-49.9 -38.6,-83.4l-28.3,-61 0.2,-7c0.6,-19.4 2.8,-62.5 3.2,-63 0.6,-0.5 57.8,17.1 59.9,18.5 6.1,4.2 7.8,5 10.3,5 5.8,-0 11.7,-5.4 11.7,-10.7 0,-1 8.5,-14 18.8,-28.8l18.9,-27 7.9,-3.1c9.3,-3.8 19.7,-11.2 23.9,-17.2 3.2,-4.7 4,-11.1 1.7,-13.4 -1.1,-1.1 -1.7,-0.7 -3.5,1.7 -6.9,9.5 -15.8,16.2 -19.7,15 -6.1,-2 -10.6,-9.7 -8.1,-14.3 0.5,-1 5.1,-5.2 10.1,-9.2 4.9,-4 9,-7.7 9,-8.1 0,-1.1 -2.8,-1.9 -6.9,-1.9 -4.2,-0 -10.3,3.9 -18.3,11.6 -5,4.9 -6.2,7.6 -8.6,20.6 -1,5.1 -3,8.5 -18.2,30 -21.3,30.4 -21.6,30.8 -24.2,30.8 -2.1,-0 -23.1,-6.5 -50.9,-15.6l-13.7,-4.5 -0.7,-3.6c-0.3,-1.9 -0.3,-3.9 0.2,-4.3 0.4,-0.4 12.3,-4.6 26.5,-9.4 19.5,-6.7 26.3,-8.6 28.6,-8.1 4,0.8 9.5,-1.6 11.9,-5.1 1.2,-2 1.7,-4.4 1.6,-7.9 -0.2,-3.9 1.5,-10.5 7.8,-30.5 4.5,-14 8.6,-26.3 9.1,-27.3 0.5,-1 6,-4.1 12.1,-7.1 10.8,-5 15.7,-8.9 15.7,-12.2 0,-2.1 -7.2,-1.8 -15.5,0.6 -3.8,1.1 -8.7,2 -10.7,2 -2.7,-0 -4.1,-0.6 -5,-2 -1.1,-1.7 -2.4,-2 -8.1,-2l-6.9,-0 0.3,7.7c0.3,7.5 0,8.8 -8.9,35.5 -5.1,15.2 -9.9,28.1 -10.5,28.6 -1.2,1 -29.3,10.9 -50.4,17.8l-10.2,3.4 -5,-2.6c-4.6,-2.3 -16.1,-5.3 -20.3,-5.4 -1.1,-0 -2.4,1.6 -3.6,4.3 -2.6,5.9 -8.3,11.4 -15.1,14.6 -4.9,2.3 -6.9,2.6 -15.6,2.6 -8.1,-0.1 -10.9,-0.5 -14.7,-2.2 -6.6,-3.1 -13.4,-9.6 -15.4,-15l-1.7,-4.4 -5.1,0.6c-6.3,0.8 -14,3.1 -18.6,5.7l-3.5,1.9 -29,-10c-15.9,-5.4 -29.8,-10.2 -30.7,-10.6 -1.2,-0.5 -4.6,-9.5 -11.2,-29.3 -9.3,-28.2 -9.5,-28.8 -8.9,-36l0.6,-7.2 -7.4,-0c-6.3,-0 -7.6,0.3 -8.7,2 -0.8,1.3 -2.3,2 -4.5,2 -1.8,-0 -6.5,-0.9 -10.5,-2 -7.6,-2.1 -16.2,-2.7 -16.2,-1z"
+      android:fillColor="#000000"
+      android:strokeColor="#00000000"/>
+  <path
+      android:pathData="M487,456.7c0,7.1 6.6,14.6 15.7,17.9 4.7,1.6 14.9,1.8 19.4,0.2 5.1,-1.7 11.8,-6.6 14,-10.1 1.6,-2.8 2.7,-10.7 1.5,-10.7 -0.3,-0 -3.5,0.7 -7.3,1.7 -9.6,2.3 -26.6,2.1 -36,-0.5l-7.3,-2 0,3.5z"
+      android:fillColor="#000000"
+      android:strokeColor="#00000000"/>
+  <path
+      android:pathData="M509.9,546.6c-1.2,2.7 -9.1,19.9 -17.5,38.2 -8.5,18.3 -15.4,33.7 -15.4,34.2 0,0.6 13.6,1 35.5,1 21.6,-0 35.5,-0.4 35.5,-0.9 0,-0.6 -6.5,-14.8 -14.3,-31.8 -7.9,-16.9 -15.7,-33.7 -17.2,-37.3 -1.6,-3.6 -3.2,-6.9 -3.7,-7.4 -0.4,-0.5 -1.7,1.2 -2.9,4z"
+      android:fillColor="#000000"
+      android:strokeColor="#00000000"/>
+  <path
+      android:pathData="M466.3,642.2c-0.9,1 -36.8,78.1 -47.9,102.5l-2.4,5.3 13.3,-0 13.4,-0 15.1,-32.3c8.3,-17.7 17.1,-36.6 19.6,-42l4.5,-9.7 30.7,0.2 30.7,0.3 11.2,24.5c6.2,13.5 14.8,32.1 19.2,41.5l7.9,17 13.2,0.3c7.3,0.1 13.2,-0.1 13.2,-0.6 0,-0.4 -3.2,-7.7 -7.1,-16.2 -34.2,-74.6 -41.2,-89.6 -42,-90.4 -0.5,-0.5 -20.5,-1.1 -46.2,-1.3 -36.6,-0.4 -45.6,-0.2 -46.4,0.9z"
+      android:fillColor="#000000"
+      android:strokeColor="#00000000"/>
+</vector>
+
+
+
+================================================================================
+UBICACIÓN: app\src\main\res\mipmap-anydpi-v26\ic_launcher.xml
+================================================================================
+
+<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@drawable/ic_launcher_background"/>
+    <foreground android:drawable="@drawable/ic_launcher_foreground"/>
+</adaptive-icon>
+
+
+================================================================================
+UBICACIÓN: app\src\main\res\mipmap-anydpi-v26\ic_launcher_round.xml
+================================================================================
+
+<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@drawable/ic_launcher_background"/>
+    <foreground android:drawable="@drawable/ic_launcher_foreground"/>
+</adaptive-icon>
+
+
+================================================================================
+UBICACIÓN: app\src\main\res\values\colors.xml
+================================================================================
+
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="purple_200">#FFBB86FC</color>
+    <color name="purple_500">#FF6200EE</color>
+    <color name="purple_700">#FF3700B3</color>
+    <color name="teal_200">#FF03DAC5</color>
+    <color name="teal_700">#FF018786</color>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+</resources>
+
+
+================================================================================
+UBICACIÓN: app\src\main\res\values\font_certs.xml
+================================================================================
+
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Copyright 2022 The Android Open Source Project
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+-->
+<resources>
+    <array name="com_google_android_gms_fonts_certs">
+        <item>@array/com_google_android_gms_fonts_certs_dev</item>
+        <item>@array/com_google_android_gms_fonts_certs_prod</item>
+    </array>
+    <string-array name="com_google_android_gms_fonts_certs_dev">
+        <item>
+            MIIEqDCCA5CgAwIBAgIJANWFuGx90071MA0GCSqGSIb3DQEBBAUAMIGUMQswCQYDVQQGEwJVUzETMBEGA1UECBMKQ2FsaWZvcm5pYTEWMBQGA1UEBxMNTW91bnRhaW4gVmlldzEQMA4GA1UEChMHQW5kcm9pZDEQMA4GA1UECxMHQW5kcm9pZDEQMA4GA1UEAxMHQW5kcm9pZDEiMCAGCSqGSIb3DQEJARYTYW5kcm9pZEBhbmRyb2lkLmNvbTAeFw0wODA0MTUyMzM2NTZaFw0zNTA5MDEyMzM2NTZaMIGUMQswCQYDVQQGEwJVUzETMBEGA1UECBMKQ2FsaWZvcm5pYTEWMBQGA1UEBxMNTW91bnRhaW4gVmlldzEQMA4GA1UEChMHQW5kcm9pZDEQMA4GA1UECxMHQW5kcm9pZDEQMA4GA1UEAxMHQW5kcm9pZDEiMCAGCSqGSIb3DQEJARYTYW5kcm9pZEBhbmRyb2lkLmNvbTCCASAwDQYJKoZIhvcNAQEBBQADggENADCCAQgCggEBANbOLggKv+IxTdGNs8/TGFy0PTP6DHThvbbR24kT9ixcOd9W+EaBPWW+wPPKQmsHxajtWjmQwWfna8mZuSeJS48LIgAZlKkpFeVyxW0qMBujb8X8ETrWy550NaFtI6t9+u7hZeTfHwqNvacKhp1RbE6dBRGWynwMVX8XW8N1+UjFaq6GCJukT4qmpN2afb8sCjUigq0GuMwYXrFVee74bQgLHWGJwPmvmLHC69EH6kWr22ijx4OKXlSIx2xT1AsSHee70w5iDBiK4aph27yH3TxkXy9V89TDdexAcKk/cVHYNnDBapcavl7y0RiQ4biu8ymM8Ga/nmzhRKya6G0cGw8CAQOjgfwwgfkwHQYDVR0OBBYEFI0cxb6VTEM8YYY6FbBMvAPyT+CyMIHJBgNVHSMEgcEwgb6AFI0cxb6VTEM8YYY6FbBMvAPyT+CyoYGapIGXMIGUMQswCQYDVQQGEwJVUzETMBEGA1UECBMKQ2FsaWZvcm5pYTEWMBQGA1UEBxMNTW91bnRhaW4gVmlldzEQMA4GA1UEChMHQW5kcm9pZDEQMA4GA1UECxMHQW5kcm9pZDEQMA4GA1UEAxMHQW5kcm9pZDEiMCAGCSqGSIb3DQEJARYTYW5kcm9pZEBhbmRyb2lkLmNvbYIJANWFuGx90071MAwGA1UdEwQFMAMBAf8wDQYJKoZIhvcNAQEEBQADggEBABnTDPEF+3iSP0wNfdIjIz1AlnrPzgAIHVvXxunW7SBrDhEglQZBbKJEk5kT0mtKoOD1JMrSu1xuTKEBahWRbqHsXclaXjoBADb0kkjVEJu/Lh5hgYZnOjvlba8Ld7HCKePCVePoTJBdI4fvugnL8TsgK05aIskyY0hKI9L8KfqfGTl1lzOv2KoWD0KWwtAWPoGChZxmQ+nBli+gwYMzM1vAkP+aayLe0a1EQimlOalO762r0GXO0ks+UeXde2Z4e+8S/pf7pITEI/tP+MxJTALw9QUWEv9lKTk+jkbqxbsh8nfBUapfKqYn0eidpwq2AzVp3juYl7//fKnaPhJD9gs=
+        </item>
+    </string-array>
+    <string-array name="com_google_android_gms_fonts_certs_prod">
+        <item>
+            MIIEQzCCAyugAwIBAgIJAMLgh0ZkSjCNMA0GCSqGSIb3DQEBBAUAMHQxCzAJBgNVBAYTAlVTMRMwEQYDVQQIEwpDYWxpZm9ybmlhMRYwFAYDVQQHEw1Nb3VudGFpbiBWaWV3MRQwEgYDVQQKEwtHb29nbGUgSW5jLjEQMA4GA1UECxMHQW5kcm9pZDEQMA4GA1UEAxMHQW5kcm9pZDAeFw0wODA4MjEyMzEzMzRaFw0zNjAxMDcyMzEzMzRaMHQxCzAJBgNVBAYTAlVTMRMwEQYDVQQIEwpDYWxpZm9ybmlhMRYwFAYDVQQHEw1Nb3VudGFpbiBWaWV3MRQwEgYDVQQKEwtHb29nbGUgSW5jLjEQMA4GA1UECxMHQW5kcm9pZDEQMA4GA1UEAxMHQW5kcm9pZDCCASAwDQYJKoZIhvcNAQEBBQADggENADCCAQgCggEBAKtWLgDYO6IIrgqWbxJOKdoR8qtW0I9Y4sypEwPpt1TTcvZApxsdyxMJZ2JORland2qSGT2y5b+3JKkedxiLDmpHpDsz2WCbdxgxRczfey5YZnTJ4VZbH0xqWVW/8lGmPav5xVwnIiJS6HXk+BVKZF+JcWjAsb/GEuq/eFdpuzSqeYTcfi6idkyugwfYwXFU1+5fZKUaRKYCwkkFQVfcAs1fXA5V+++FGfvjJ/CxURaSxaBvGdGDhfXE28LWuT9ozCl5xw4Yq5OGazvV24mZVSoOO0yZ31j7kYvtwYK6NeADwbSxDdJEqO4k//0zOHKrUiGYXtqw/A0LFFtqoZKFjnkCAQOjgdkwgdYwHQYDVR0OBBYEFMd9jMIhF1Ylmn/Tgt9r45jk14alMIGmBgNVHSMEgZ4wgZuAFMd9jMIhF1Ylmn/Tgt9r45jk14aloXikdjB0MQswCQYDVQQGEwJVUzETMBEGA1UECBMKQ2FsaWZvcm5pYTEWMBQGA1UEBxMNTW91bnRhaW4gVmlldzEUMBIGA1UEChMLR29vZ2xlIEluYy4xEDAOBgNVBAsTB0FuZHJvaWQxEDAOBgNVBAMTB0FuZHJvaWSCCQDC4IdGZEowjTAMBgNVHRMEBTADAQH/MA0GCSqGSIb3DQEBBAUAA4IBAQBt0lLO74UwLDYKqs6Tm8/yzKkEu116FmH4rkaymUIE0P9KaMftGlMexFlaYjzmB2OxZyl6euNXEsQH8gjwyxCUKRJNexBiGcCEyj6z+a1fuHHvkiaai+KL8W1EyNmgjmyy8AW7P+LLlkR+ho5zEHatRbM/YAnqGcFh5iZBqpknHf1SKMXFh4dd239FJ1jWYfbMDMy3NS5CTMQ2XFI1MvcyUTdZPErjQfTbQe3aDQsQcafEQPD+nqActifKZ0Np0IS9L9kR/wbNvyz6ENwPiTrjV2KRkEjH78ZMcUQXg0L3BYHJ3lc69Vs5Ddf9uUGGMYldX3WfMBEmh/9iFBDAaTCK
+        </item>
+    </string-array>
+</resources>
+
+
+
+================================================================================
+UBICACIÓN: app\src\main\res\values\strings.xml
+================================================================================
+
+<resources>
+    <string name="app_name">AgenTasker</string>
+
+    <!-- Google OAuth 2.0 Web Client ID para Firebase Auth -->
+    <!-- Android Client ID recreado el 6 de febrero de 2026 -->
+    <!-- Package: com.agentasker, SHA-1: D3:B0:F9:66:D6:00:11:88:0E:20:E7:E5:D7:6C:2C:ED:41:A2:44:BA -->
+    <string name="google_web_client_id">751642418230-dg970vfg6gd566vc90d1g0h1qmh37osd.apps.googleusercontent.com</string>
+    <string name="default_web_client_id">751642418230-dg970vfg6gd566vc90d1g0h1qmh37osd.apps.googleusercontent.com</string>
+
+    <!-- Task Form -->
+    <string name="task_new_title">Nueva Tarea</string>
+    <string name="task_edit_title">Editar Tarea</string>
+    <string name="task_field_title">Título</string>
+    <string name="task_field_title_placeholder">Ingresa el título de la tarea</string>
+    <string name="task_field_description">Descripción</string>
+    <string name="task_field_description_placeholder">Describe la tarea…</string>
+    <string name="task_field_priority">Prioridad</string>
+    <string name="task_button_create">Crear</string>
+    <string name="task_button_save">Guardar</string>
+    <string name="task_button_cancel">Cancelar</string>
+
+    <!-- Priority -->
+    <string name="priority_high">Alta</string>
+    <string name="priority_medium">Media</string>
+    <string name="priority_low">Baja</string>
+</resources>
+
+
+================================================================================
+UBICACIÓN: app\src\main\res\values\themes.xml
+================================================================================
+
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <style name="Theme.AgenTasker" parent="android:Theme.Material.Light.NoActionBar" />
+</resources>
+
+
+================================================================================
+UBICACIÓN: app\src\main\res\xml\backup_rules.xml
+================================================================================
+
+<?xml version="1.0" encoding="utf-8"?><!--
+   Sample backup rules file; uncomment and customize as necessary.
+   See https://developer.android.com/guide/topics/data/autobackup
+   for details.
+   Note: This file is ignored for devices older than API 31
+   See https://developer.android.com/about/versions/12/backup-restore
+-->
+<full-backup-content>
+    <!--
+   <include domain="sharedpref" path="."/>
+   <exclude domain="sharedpref" path="device.xml"/>
+-->
+</full-backup-content>
+
+
+================================================================================
+UBICACIÓN: app\src\main\res\xml\data_extraction_rules.xml
+================================================================================
+
+<?xml version="1.0" encoding="utf-8"?><!--
+   Sample data extraction rules file; uncomment and customize as necessary.
+   See https://developer.android.com/about/versions/12/backup-restore#xml-changes
+   for details.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <!-- TODO: Use <include> and <exclude> to control what is backed up.
+        <include .../>
+        <exclude .../>
+        -->
+    </cloud-backup>
+    <!--
+    <device-transfer>
+        <include .../>
+        <exclude .../>
+    </device-transfer>
+    -->
+</data-extraction-rules>
+
+
+================================================================================
+UBICACIÓN: app\src\main\res\xml\network_security_config.xml
+================================================================================
+
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+    <!-- Permitir HTTPS para la API -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">agentaskerapi.alphahills.site</domain>
+    </domain-config>
+</network-security-config>
+
+
+

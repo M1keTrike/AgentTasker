@@ -41,7 +41,13 @@ fun AgentTaskerApp(appContainer: com.agentasker.core.di.AppContainer) {
     val navController = rememberNavController()
     val navigatorWrapper = remember { NavigatorWrapper(navController) }
 
-    val loginModule = remember { LoginModule(appContainer, appContainer.secureTokenStorage) }
+    val loginModule = remember {
+        LoginModule(
+            appContainer = appContainer,
+            secureTokenStorage = appContainer.secureTokenStorage,
+            context = appContainer.context
+        )
+    }
     val loginViewModel: LoginViewModel = viewModel(
         factory = loginModule.provideLoginViewModelFactory()
     )
@@ -62,7 +68,9 @@ fun AgentTaskerApp(appContainer: com.agentasker.core.di.AppContainer) {
             LoginScreen(
                 viewModel = loginViewModel,
                 onLoginSuccess = {
+                    android.util.Log.d("MainActivity", "onLoginSuccess callback ejecutado, navegando a Tasks")
                     navigatorWrapper.navigateToTasks(clearBackStack = true)
+                    android.util.Log.d("MainActivity", "Navegación a Tasks completada")
                 }
             )
         }
