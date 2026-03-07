@@ -104,6 +104,11 @@ dependencies {
     implementation(libs.googleid)
 
 
+    // OAuth2 with PKCE (AppAuth) - Standard approach
+    implementation(libs.appauth)
+    implementation(libs.androidx.browser)
+    implementation(libs.androidx.security.crypto)
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
