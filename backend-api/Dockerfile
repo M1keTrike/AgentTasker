@@ -1,7 +1,7 @@
 # ================================
-# Build Stage
+# Dependencies Stage
 # ================================
-FROM node:20-alpine AS builder
+FROM node:20-alpine AS deps
 
 # Instalar pnpm
 RUN corepack enable && corepack prepare pnpm@latest --activate
@@ -11,8 +11,29 @@ WORKDIR /app
 # Copiar archivos de dependencias
 COPY package.json pnpm-lock.yaml ./
 
-# Instalar dependencias
+# Instalar todas las dependencias (incluyendo dev)
 RUN pnpm install --frozen-lockfile
+
+# ================================
+# Development Stage
+# ================================
+FROM deps AS development
+
+# Copiar código fuente
+COPY . .
+
+ENV NODE_ENV=development
+ENV PORT=3000
+
+EXPOSE 3000
+
+# Hot-reload con NestJS CLI
+CMD ["pnpm", "run", "start:dev"]
+
+# ================================
+# Build Stage
+# ================================
+FROM deps AS builder
 
 # Copiar código fuente
 COPY . .

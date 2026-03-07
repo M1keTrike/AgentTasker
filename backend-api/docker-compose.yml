@@ -1,21 +1,24 @@
+# =============================================
+# Base — compartido entre todos los entornos.
+# No ejecutar directamente.
+# =============================================
 services:
   api:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: agentasker-api
-    restart: unless-stopped
     ports:
       - "${PORT:-3000}:3000"
     environment:
-      - NODE_ENV=${NODE_ENV:-production}
+      - NODE_ENV=${NODE_ENV}
       - PORT=3000
       - DB_HOST=postgres
       - DB_PORT=5432
-      - DB_USERNAME=${DB_USERNAME:-postgres}
-      - DB_PASSWORD=${DB_PASSWORD:-postgres}
-      - DB_NAME=${DB_NAME:-agentasker}
-      - DB_LOGGING=${DB_LOGGING:-false}
+      - DB_USERNAME=${DB_USERNAME}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - DB_LOGGING=${DB_LOGGING}
     depends_on:
       postgres:
         condition: service_healthy
@@ -25,17 +28,12 @@ services:
   postgres:
     image: postgres:16-alpine
     container_name: agentasker-postgres
-    restart: unless-stopped
     environment:
-      - POSTGRES_USER=${DB_USERNAME:-postgres}
-      - POSTGRES_PASSWORD=${DB_PASSWORD:-postgres}
-      - POSTGRES_DB=${DB_NAME:-agentasker}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "${DB_PORT:-5432}:5432"
+      - POSTGRES_USER=${DB_USERNAME}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=${DB_NAME}
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-postgres} -d ${DB_NAME:-agentasker}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME} -d ${DB_NAME}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -45,6 +43,3 @@ services:
 networks:
   agentasker-network:
     driver: bridge
-
-volumes:
-  postgres_data:

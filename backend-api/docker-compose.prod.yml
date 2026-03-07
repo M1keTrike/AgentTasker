@@ -1,18 +1,18 @@
+# =============================================
+# Producción — ejecutar con:
+# docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# =============================================
 services:
   api:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: agentasker-api
     restart: unless-stopped
-    ports:
-      - "${PORT:-3000}:3000"
     environment:
       - NODE_ENV=production
-      - PORT=3000
-      - DB_HOST=${DB_HOST}
-      - DB_PORT=${DB_PORT:-5432}
-      - DB_USERNAME=${DB_USERNAME}
-      - DB_PASSWORD=${DB_PASSWORD}
-      - DB_NAME=${DB_NAME}
       - DB_LOGGING=false
+
+  postgres:
+    restart: unless-stopped
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:

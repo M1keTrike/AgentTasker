@@ -1,0 +1,20 @@
+# =============================================
+# Desarrollo — se fusiona automáticamente con
+# docker-compose.yml al ejecutar: docker compose up
+# =============================================
+services:
+  api:
+    build:
+      target: development
+    command: pnpm run start:dev
+    volumes:
+      - ./src:/app/src
+    environment:
+      - NODE_ENV=development
+      - DB_LOGGING=true
+
+  postgres:
+    ports:
+      - '${DB_PORT:-5432}:5432'
+    tmpfs:
+      - /var/lib/postgresql/data
