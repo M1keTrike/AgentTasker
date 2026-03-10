@@ -12,18 +12,22 @@ import com.agentasker.features.login.domain.usecases.RegisterUseCase
 import com.agentasker.features.login.domain.usecases.SignInWithGoogleUseCase
 import com.agentasker.features.login.domain.usecases.SignOutUseCase
 import com.agentasker.features.login.presentation.screens.LoginUiState
+import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
-class LoginViewModel(
+@HiltViewModel
+class LoginViewModel @Inject constructor(
     private val loginUseCase: LoginUseCase,
     private val registerUseCase: RegisterUseCase,
     private val signOutUseCase: SignOutUseCase,
     private val signInWithGoogleUseCase: SignInWithGoogleUseCase,
     private val getCurrentUserUseCase: GetCurrentUserUseCase,
-    private val context: Context
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(LoginUiState())
@@ -178,4 +182,3 @@ class LoginViewModel(
         _uiState.value = _uiState.value.copy(password = password)
     }
 }
-

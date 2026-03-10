@@ -2,8 +2,9 @@ package com.agentasker.features.login.domain.usecases
 
 import com.agentasker.features.login.domain.repositories.AuthRepository
 import com.agentasker.features.login.domain.validators.AuthValidator
+import javax.inject.Inject
 
-class RegisterUseCase(
+class RegisterUseCase @Inject constructor(
     private val authRepository: AuthRepository
 ) {
     suspend operator fun invoke(username: String, email: String, password: String): Result<Unit> {

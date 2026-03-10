@@ -1,16 +1,7 @@
 package com.agentasker
 
 import android.app.Application
-import com.agentasker.core.di.AppContainer
+import dagger.hilt.android.HiltAndroidApp
 
-class AgentTaskerApplication : Application() {
-
-    lateinit var appContainer: AppContainer
-        private set
-
-    override fun onCreate() {
-        super.onCreate()
-        appContainer = AppContainer(this)
-    }
-}
-
+@HiltAndroidApp
+class AgentTaskerApplication : Application()

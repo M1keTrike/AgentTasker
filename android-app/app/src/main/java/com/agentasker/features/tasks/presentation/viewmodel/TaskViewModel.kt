@@ -8,12 +8,15 @@ import com.agentasker.features.tasks.domain.usecases.DeleteTaskUseCase
 import com.agentasker.features.tasks.domain.usecases.GetTasksUseCase
 import com.agentasker.features.tasks.domain.usecases.UpdateTaskUseCase
 import com.agentasker.features.tasks.presentation.screens.TaskUiState
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
-class TaskViewModel(
+@HiltViewModel
+class TaskViewModel @Inject constructor(
     private val getTasksUseCase: GetTasksUseCase,
     private val createTaskUseCase: CreateTaskUseCase,
     private val updateTaskUseCase: UpdateTaskUseCase,
@@ -178,4 +181,3 @@ class TaskViewModel(
         _uiState.value = _uiState.value.copy(formPriority = priority)
     }
 }
-

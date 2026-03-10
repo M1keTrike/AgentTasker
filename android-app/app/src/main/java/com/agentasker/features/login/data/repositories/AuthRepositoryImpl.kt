@@ -10,8 +10,9 @@ import com.agentasker.features.login.data.datasources.remote.model.RegisterReque
 import com.agentasker.features.login.domain.entities.AuthToken
 import com.agentasker.features.login.domain.entities.User
 import com.agentasker.features.login.domain.repositories.AuthRepository
+import javax.inject.Inject
 
-class AuthRepositoryImpl(
+class AuthRepositoryImpl @Inject constructor(
     private val api: AgentTaskerApi,
     private val secureStorage: SecureTokenStorage
 ) : AuthRepository {

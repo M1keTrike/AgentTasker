@@ -4,8 +4,9 @@ import android.content.Context
 import com.agentasker.features.login.data.services.GoogleAuthService
 import com.agentasker.features.login.domain.entities.User
 import com.agentasker.features.login.domain.repositories.AuthRepository
+import javax.inject.Inject
 
-class SignInWithGoogleUseCase(
+class SignInWithGoogleUseCase @Inject constructor(
     private val authRepository: AuthRepository,
     private val googleAuthService: GoogleAuthService
 ) {
