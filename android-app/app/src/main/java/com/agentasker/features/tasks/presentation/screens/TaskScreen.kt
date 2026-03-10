@@ -24,20 +24,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.agentasker.core.ui.components.EmptyState
 import com.agentasker.core.ui.components.LoadingState
 import com.agentasker.features.tasks.presentation.components.TaskCard
 import com.agentasker.features.tasks.presentation.viewmodel.TaskViewModel
-import com.agentasker.features.tasks.presentation.viewmodel.TaskViewModelFactory
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TaskScreen(
-    factory: TaskViewModelFactory
+    viewModel: TaskViewModel = hiltViewModel()
 ) {
-    val viewModel: TaskViewModel = viewModel(factory = factory)
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -133,4 +131,3 @@ fun TaskScreen(
         }
     }
 }
-

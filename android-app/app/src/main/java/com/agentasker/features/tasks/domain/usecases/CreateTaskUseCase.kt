@@ -2,8 +2,9 @@ package com.agentasker.features.tasks.domain.usecases
 
 import com.agentasker.features.tasks.domain.entities.Task
 import com.agentasker.features.tasks.domain.repositories.TaskRepository
+import javax.inject.Inject
 
-class CreateTaskUseCase(
+class CreateTaskUseCase @Inject constructor(
     private val taskRepository: TaskRepository
 ) {
     suspend operator fun invoke(title: String, description: String, priority: String): Result<Task> {

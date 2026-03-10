@@ -6,8 +6,9 @@ import com.agentasker.features.tasks.data.datasources.remote.model.CreateTaskReq
 import com.agentasker.features.tasks.data.datasources.remote.model.UpdateTaskRequest
 import com.agentasker.features.tasks.domain.entities.Task
 import com.agentasker.features.tasks.domain.repositories.TaskRepository
+import javax.inject.Inject
 
-class TaskRepositoryImpl(
+class TaskRepositoryImpl @Inject constructor(
     private val api: AgentTaskerApi
 ) : TaskRepository {
 

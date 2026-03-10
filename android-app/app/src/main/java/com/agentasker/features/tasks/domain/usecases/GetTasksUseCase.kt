@@ -2,8 +2,9 @@ package com.agentasker.features.tasks.domain.usecases
 
 import com.agentasker.features.tasks.domain.entities.Task
 import com.agentasker.features.tasks.domain.repositories.TaskRepository
+import javax.inject.Inject
 
-class GetTasksUseCase(
+class GetTasksUseCase @Inject constructor(
     private val repository: TaskRepository
 ) {
 

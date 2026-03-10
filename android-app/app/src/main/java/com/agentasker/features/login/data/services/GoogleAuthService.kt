@@ -11,9 +11,10 @@ import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
 import kotlinx.coroutines.tasks.await
+import javax.inject.Inject
 
 
-class GoogleAuthService(
+class GoogleAuthService @Inject constructor(
     private val credentialManager: CredentialManager,
     private val firebaseAuth: FirebaseAuth
 ) {

@@ -7,52 +7,40 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.agentasker.core.navigation.NavigatorWrapper
 import com.agentasker.core.navigation.Screen
 import com.agentasker.core.ui.theme.AgenTaskerTheme
-import com.agentasker.features.login.di.LoginModule
 import com.agentasker.features.login.presentation.screens.LoginScreen
 import com.agentasker.features.login.presentation.viewmodel.LoginViewModel
-import com.agentasker.features.tasks.di.TasksModule
 import com.agentasker.features.tasks.presentation.screens.TaskScreen
+import dagger.hilt.android.AndroidEntryPoint
 
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        val appContainer = (application as AgentTaskerApplication).appContainer
-
         setContent {
             AgenTaskerTheme {
-                AgentTaskerApp(appContainer)
+                AgentTaskerApp()
             }
         }
     }
 }
 
 @Composable
-fun AgentTaskerApp(appContainer: com.agentasker.core.di.AppContainer) {
+fun AgentTaskerApp() {
     val navController = rememberNavController()
     val navigatorWrapper = remember { NavigatorWrapper(navController) }
 
-    val loginModule = remember {
-        LoginModule(
-            appContainer = appContainer,
-            secureTokenStorage = appContainer.secureTokenStorage,
-            context = appContainer.context
-        )
-    }
-    val loginViewModel: LoginViewModel = viewModel(
-        factory = loginModule.provideLoginViewModelFactory()
-    )
+    val loginViewModel: LoginViewModel = hiltViewModel()
     val loginUiState by loginViewModel.uiState.collectAsStateWithLifecycle()
-
 
     val startDestination = if (loginUiState.isAuthenticated) {
         Screen.Tasks.route
@@ -76,10 +64,7 @@ fun AgentTaskerApp(appContainer: com.agentasker.core.di.AppContainer) {
         }
 
         composable(Screen.Tasks.route) {
-            TaskScreen(factory = TasksModule(appContainer).provideTaskViewModelFactory())
+            TaskScreen()
         }
     }
 }
-
-
-
