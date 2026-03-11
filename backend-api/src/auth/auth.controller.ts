@@ -21,6 +21,7 @@ export class AuthController {
       dto.idToken,
       dto.authorizationCode,
       dto.redirectUri,
+      dto.codeVerifier,
     );
   }
 

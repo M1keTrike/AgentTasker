@@ -26,14 +26,16 @@ class ClassroomRepositoryImpl @Inject constructor(
 
     override suspend fun connectClassroom(
         idToken: String,
-        authorizationCode: String
+        authorizationCode: String,
+        codeVerifier: String?
     ): Result<Unit> {
         return try {
             api.connectClassroom(
                 ClassroomConnectRequestDTO(
                     idToken = idToken,
                     authorizationCode = authorizationCode,
-                    redirectUri = REDIRECT_URI
+                    redirectUri = REDIRECT_URI,
+                    codeVerifier = codeVerifier
                 )
             )
             Result.success(Unit)

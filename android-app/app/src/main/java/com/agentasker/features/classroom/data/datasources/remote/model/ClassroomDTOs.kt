@@ -5,7 +5,8 @@ import com.google.gson.annotations.SerializedName
 data class ClassroomConnectRequestDTO(
     @SerializedName("idToken") val idToken: String,
     @SerializedName("authorizationCode") val authorizationCode: String,
-    @SerializedName("redirectUri") val redirectUri: String
+    @SerializedName("redirectUri") val redirectUri: String,
+    @SerializedName("codeVerifier") val codeVerifier: String?
 )
 
 data class ClassroomCourseDTO(

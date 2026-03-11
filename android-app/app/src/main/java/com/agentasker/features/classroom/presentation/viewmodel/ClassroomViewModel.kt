@@ -111,7 +111,7 @@ class ClassroomViewModel @Inject constructor(
         }
     }
 
-    fun onClassroomConnected(authorizationCode: String) {
+    fun onClassroomConnected(authorizationCode: String, codeVerifier: String?) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isConnecting = true, error = null)
 
@@ -124,7 +124,7 @@ class ClassroomViewModel @Inject constructor(
                 return@launch
             }
 
-            connectClassroomUseCase(idToken, authorizationCode).fold(
+            connectClassroomUseCase(idToken, authorizationCode, codeVerifier).fold(
                 onSuccess = {
                     _uiState.value = _uiState.value.copy(
                         isConnecting = false,

@@ -6,7 +6,7 @@ import javax.inject.Inject
 class ConnectClassroomUseCase @Inject constructor(
     private val repository: ClassroomRepository
 ) {
-    suspend operator fun invoke(idToken: String, authorizationCode: String): Result<Unit> {
-        return repository.connectClassroom(idToken, authorizationCode)
+    suspend operator fun invoke(idToken: String, authorizationCode: String, codeVerifier: String? = null): Result<Unit> {
+        return repository.connectClassroom(idToken, authorizationCode, codeVerifier)
     }
 }

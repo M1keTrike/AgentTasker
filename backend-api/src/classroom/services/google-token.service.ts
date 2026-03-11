@@ -21,7 +21,7 @@ export class GoogleTokenService {
     );
   }
 
-  async exchangeCode(authorizationCode: string, redirectUri: string): Promise<{
+  async exchangeCode(authorizationCode: string, redirectUri: string, codeVerifier?: string): Promise<{
     accessToken: string;
     refreshToken: string | null;
     expiryDate: number | null;
@@ -29,6 +29,7 @@ export class GoogleTokenService {
     const { tokens } = await this.oauth2Client.getToken({
       code: authorizationCode,
       redirect_uri: redirectUri,
+      ...(codeVerifier && { codeVerifier }),
     });
     return {
       accessToken: tokens.access_token ?? '',

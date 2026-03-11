@@ -50,12 +50,20 @@ class ClassroomAuthService @Inject constructor(
         return authService.getAuthorizationRequestIntent(authRequest)
     }
 
-    fun handleAuthResponse(data: Intent): String {
+    data class AuthResult(
+        val authorizationCode: String,
+        val codeVerifier: String?
+    )
+
+    fun handleAuthResponse(data: Intent): AuthResult {
         val response = AuthorizationResponse.fromIntent(data)
         val error = AuthorizationException.fromIntent(data)
 
         if (response != null && response.authorizationCode != null) {
-            return response.authorizationCode!!
+            return AuthResult(
+                authorizationCode = response.authorizationCode!!,
+                codeVerifier = response.request.codeVerifier
+            )
         }
 
         throw error ?: IllegalStateException("No authorization code received")
