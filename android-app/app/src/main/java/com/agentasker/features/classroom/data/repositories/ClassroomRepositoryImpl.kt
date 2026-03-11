@@ -21,7 +21,7 @@ class ClassroomRepositoryImpl @Inject constructor(
 ) : ClassroomRepository {
 
     companion object {
-        private const val REDIRECT_URI = "com.agentasker:/oauth2redirect"
+        private const val REDIRECT_URI = "https://agentaskerapi.alphahills.site/auth/classroom/callback"
     }
 
     override suspend fun connectClassroom(

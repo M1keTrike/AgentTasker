@@ -4,9 +4,7 @@ import {
   PrimaryGeneratedColumn,
   CreateDateColumn,
   UpdateDateColumn,
-  OneToOne,
 } from 'typeorm';
-import { ClassroomData } from '../../classroom/entities/classroom-data.entity';
 
 @Entity('users')
 export class User {
@@ -33,9 +31,6 @@ export class User {
 
   @Column({ default: false })
   emailVerified: boolean;
-
-  @OneToOne(() => ClassroomData, (classroomData) => classroomData.user)
-  classroomData: ClassroomData | null;
 
   @CreateDateColumn()
   createdAt: Date;
