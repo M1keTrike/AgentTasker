@@ -29,6 +29,16 @@ class NavigatorWrapper(private val navController: NavHostController) {
         }
     }
 
+    fun navigateToClassroom(clearBackStack: Boolean = false) {
+        if (clearBackStack) {
+            navController.navigate(Screen.Classroom.route) {
+                popUpTo(0) { inclusive = true }
+            }
+        } else {
+            navController.navigate(Screen.Classroom.route)
+        }
+    }
+
     fun navigateBack() {
         navController.popBackStack()
     }
