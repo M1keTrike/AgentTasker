@@ -1,13 +1,17 @@
 import { Module } from '@nestjs/common';
 import { JwtModule, JwtModuleOptions } from '@nestjs/jwt';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { UsersModule } from '../users/users.module';
+import { ClassroomData } from '../classroom/entities/classroom-data.entity';
+import { GoogleTokenService } from '../classroom/services/google-token.service';
 
 @Module({
   imports: [
     UsersModule,
+    TypeOrmModule.forFeature([ClassroomData]),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService): JwtModuleOptions => ({
@@ -20,6 +24,7 @@ import { UsersModule } from '../users/users.module';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService],
+  providers: [AuthService, GoogleTokenService],
+  exports: [GoogleTokenService],
 })
 export class AuthModule {}

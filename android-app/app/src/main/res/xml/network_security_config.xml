@@ -6,9 +6,15 @@
         </trust-anchors>
     </base-config>
 
-    <!-- Permitir HTTPS para la API -->
+    <!-- Producción: solo HTTPS -->
     <domain-config cleartextTrafficPermitted="false">
         <domain includeSubdomains="true">agentaskerapi.alphahills.site</domain>
+    </domain-config>
+
+    <!-- Desarrollo local: permitir HTTP -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">10.14.0.154</domain><!-- Emulador -->
+        <domain includeSubdomains="false">localhost</domain>
     </domain-config>
 </network-security-config>
 

@@ -1,5 +1,9 @@
 package com.agentasker.core.network
 
+import com.agentasker.features.classroom.data.datasources.remote.model.ClassroomConnectRequestDTO
+import com.agentasker.features.classroom.data.datasources.remote.model.ClassroomCourseDTO
+import com.agentasker.features.classroom.data.datasources.remote.model.ClassroomStatusDTO
+import com.agentasker.features.classroom.data.datasources.remote.model.ClassroomTaskDTO
 import com.agentasker.features.login.data.datasources.remote.model.AuthResponseDTO
 import com.agentasker.features.login.data.datasources.remote.model.GoogleSignInRequestDTO
 import com.agentasker.features.login.data.datasources.remote.model.LoginRequestDTO
@@ -50,6 +54,22 @@ interface AgentTaskerApi {
 
     @GET("users/profile")
     suspend fun getProfile(): ProfileResponseDTO
+
+    // Classroom endpoints
+    @POST("auth/google-classroom")
+    suspend fun connectClassroom(@Body request: ClassroomConnectRequestDTO): AuthResponseDTO
+
+    @GET("classroom/courses")
+    suspend fun getClassroomCourses(): List<ClassroomCourseDTO>
+
+    @GET("classroom/courses/{courseId}/tasks")
+    suspend fun getClassroomTasksByCourse(@Path("courseId") courseId: String): List<ClassroomTaskDTO>
+
+    @GET("classroom/tasks")
+    suspend fun getAllClassroomTasks(): List<ClassroomTaskDTO>
+
+    @GET("classroom/status")
+    suspend fun getClassroomStatus(): ClassroomStatusDTO
 
 }
 
