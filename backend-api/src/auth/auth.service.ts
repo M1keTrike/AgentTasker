@@ -78,7 +78,7 @@ export class AuthService {
     return this.buildAuthResponse(user, accessToken, idToken);
   }
 
-  async googleClassroomLogin(idToken: string, authorizationCode: string) {
+  async googleClassroomLogin(idToken: string, authorizationCode: string, redirectUri: string) {
     const googlePayload = await this.verifyGoogleIdToken(idToken);
 
     const user = await this.usersService.findOrCreateFromGoogle({
@@ -90,7 +90,7 @@ export class AuthService {
     });
 
     // Exchange the authorization code for Google tokens and store them
-    const tokens = await this.googleTokenService.exchangeCode(authorizationCode);
+    const tokens = await this.googleTokenService.exchangeCode(authorizationCode, redirectUri);
     await this.googleTokenService.saveTokens(user.id, tokens);
 
     const jwtPayload = { sub: user.id, username: user.username ?? user.email };

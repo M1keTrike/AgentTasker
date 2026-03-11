@@ -20,6 +20,10 @@ class ClassroomRepositoryImpl @Inject constructor(
     private val classroomTaskDao: ClassroomTaskDao
 ) : ClassroomRepository {
 
+    companion object {
+        private const val REDIRECT_URI = "com.agentasker:/oauth2redirect"
+    }
+
     override suspend fun connectClassroom(
         idToken: String,
         authorizationCode: String
@@ -28,7 +32,8 @@ class ClassroomRepositoryImpl @Inject constructor(
             api.connectClassroom(
                 ClassroomConnectRequestDTO(
                     idToken = idToken,
-                    authorizationCode = authorizationCode
+                    authorizationCode = authorizationCode,
+                    redirectUri = REDIRECT_URI
                 )
             )
             Result.success(Unit)

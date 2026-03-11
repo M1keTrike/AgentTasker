@@ -8,4 +8,8 @@ export class GoogleClassroomLoginDto {
   @IsString()
   @IsNotEmpty()
   authorizationCode: string;
+
+  @IsString()
+  @IsNotEmpty()
+  redirectUri: string;
 }

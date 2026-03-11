@@ -19,6 +19,7 @@ export class AuthController {
     return this.authService.googleClassroomLogin(
       dto.idToken,
       dto.authorizationCode,
+      dto.redirectUri,
     );
   }
 }

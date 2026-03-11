@@ -1,3 +1,4 @@
+/* eslint-disable prettier/prettier */
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -17,16 +18,18 @@ export class GoogleTokenService {
     this.oauth2Client = new OAuth2Client(
       this.configService.get<string>('GOOGLE_CLIENT_ID'),
       this.configService.get<string>('GOOGLE_CLIENT_SECRET'),
-      this.configService.get<string>('GOOGLE_REDIRECT_URI'),
     );
   }
 
-  async exchangeCode(authorizationCode: string): Promise<{
+  async exchangeCode(authorizationCode: string, redirectUri: string): Promise<{
     accessToken: string;
     refreshToken: string | null;
     expiryDate: number | null;
   }> {
-    const { tokens } = await this.oauth2Client.getToken(authorizationCode);
+    const { tokens } = await this.oauth2Client.getToken({
+      code: authorizationCode,
+      redirect_uri: redirectUri,
+    });
     return {
       accessToken: tokens.access_token ?? '',
       refreshToken: tokens.refresh_token ?? null,
