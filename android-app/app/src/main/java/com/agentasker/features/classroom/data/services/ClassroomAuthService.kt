@@ -19,7 +19,7 @@ class ClassroomAuthService @Inject constructor(
     companion object {
         private const val AUTH_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth"
         private const val TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token"
-        private const val REDIRECT_URI = "com.agentasker:/oauth2redirect"
+        private const val REDIRECT_URI = "https://agentaskerapi.alphahills.site/auth/classroom/callback"
         private val CLASSROOM_SCOPES = listOf(
             "https://www.googleapis.com/auth/classroom.courses.readonly",
             "https://www.googleapis.com/auth/classroom.coursework.me.readonly",
@@ -40,11 +40,9 @@ class ClassroomAuthService @Inject constructor(
             Uri.parse(REDIRECT_URI)
         )
             .setScopes(CLASSROOM_SCOPES)
+            .setPrompt("consent")
             .setAdditionalParameters(
-                mapOf(
-                    "access_type" to "offline",
-                    "prompt" to "consent"
-                )
+                mapOf("access_type" to "offline")
             )
             .build()
 
