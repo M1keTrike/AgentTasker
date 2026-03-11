@@ -1,5 +1,5 @@
 import { Controller, Post, Body, Get, Query, Res, HttpCode, HttpStatus } from '@nestjs/common';
-import { Response } from 'express';
+import type { Response } from 'express';
 import { AuthService } from './auth.service';
 import { GoogleLoginDto } from './dto/google-login.dto';
 import { GoogleClassroomLoginDto } from './dto/google-classroom-login.dto';
