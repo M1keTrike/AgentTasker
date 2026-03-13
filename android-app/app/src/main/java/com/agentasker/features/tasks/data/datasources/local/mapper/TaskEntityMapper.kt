@@ -10,6 +10,8 @@ fun TaskEntity.toDomain(): Task {
         title = title,
         description = description,
         priority = priority,
+        status = status,
+        dueDate = dueDate,
         createdAt = createdAt,
         updatedAt = updatedAt
     )
@@ -21,6 +23,8 @@ fun Task.toEntity(isSynced: Boolean = true): TaskEntity {
         title = title,
         description = description,
         priority = priority,
+        status = status,
+        dueDate = dueDate,
         createdAt = createdAt,
         updatedAt = updatedAt,
         isSynced = isSynced
@@ -33,6 +37,8 @@ fun TaskDTO.toEntity(isSynced: Boolean = true): TaskEntity {
         title = title,
         description = description,
         priority = priority,
+        status = status,
+        dueDate = dueDate,
         createdAt = createdAt,
         updatedAt = updatedAt,
         isSynced = isSynced

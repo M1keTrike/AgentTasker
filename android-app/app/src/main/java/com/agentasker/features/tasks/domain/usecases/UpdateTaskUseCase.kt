@@ -11,10 +11,12 @@ class UpdateTaskUseCase @Inject constructor(
         id: String,
         title: String?,
         description: String?,
-        priority: String?
+        priority: String?,
+        status: String? = null,
+        dueDate: String? = null
     ): Result<Task> {
         return try {
-            val task = taskRepository.updateTask(id, title, description, priority)
+            val task = taskRepository.updateTask(id, title, description, priority, status, dueDate)
             Result.success(task)
         } catch (e: Exception) {
             Result.failure(e)

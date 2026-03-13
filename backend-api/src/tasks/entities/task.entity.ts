@@ -15,6 +15,12 @@ export enum TaskPriority {
   LOW = 'low',
 }
 
+export enum TaskStatus {
+  PENDING = 'pending',
+  IN_PROGRESS = 'in_progress',
+  COMPLETED = 'completed',
+}
+
 @Entity('tasks')
 export class Task {
   @PrimaryGeneratedColumn()
@@ -32,6 +38,16 @@ export class Task {
     default: TaskPriority.MEDIUM,
   })
   priority: TaskPriority;
+
+  @Column({
+    type: 'text',
+    enum: TaskStatus,
+    default: TaskStatus.PENDING,
+  })
+  status: TaskStatus;
+
+  @Column({ type: 'timestamp', nullable: true })
+  dueDate: Date | null;
 
   @Column({ nullable: true })
   userId: number;

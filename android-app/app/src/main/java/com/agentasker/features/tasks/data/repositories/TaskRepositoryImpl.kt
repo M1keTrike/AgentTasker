@@ -56,11 +56,13 @@ class TaskRepositoryImpl @Inject constructor(
             ?: throw Exception("Tarea no encontrada")
     }
 
-    override suspend fun createTask(title: String, description: String, priority: String): Task {
+    override suspend fun createTask(title: String, description: String, priority: String, status: String, dueDate: String?): Task {
         val request = CreateTaskRequest(
             title = title,
             description = description,
-            priority = priority
+            priority = priority,
+            status = status,
+            dueDate = dueDate
         )
         if (isOnline()) {
             try {
@@ -75,6 +77,8 @@ class TaskRepositoryImpl @Inject constructor(
             title = title,
             description = description,
             priority = priority,
+            status = status,
+            dueDate = dueDate,
             isSynced = false
         )
         taskDao.upsertTask(localEntity)
@@ -85,12 +89,16 @@ class TaskRepositoryImpl @Inject constructor(
         id: String,
         title: String?,
         description: String?,
-        priority: String?
+        priority: String?,
+        status: String?,
+        dueDate: String?
     ): Task {
         val request = UpdateTaskRequest(
             title = title,
             description = description,
-            priority = priority
+            priority = priority,
+            status = status,
+            dueDate = dueDate
         )
         if (isOnline()) {
             try {
@@ -106,6 +114,8 @@ class TaskRepositoryImpl @Inject constructor(
             title = title ?: current.title,
             description = description ?: current.description,
             priority = priority ?: current.priority,
+            status = status ?: current.status,
+            dueDate = dueDate ?: current.dueDate,
             isSynced = false
         )
         taskDao.upsertTask(updated)
