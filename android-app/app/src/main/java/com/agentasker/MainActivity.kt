@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Dashboard
@@ -24,10 +25,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.agentasker.core.navigation.NavigatorWrapper
 import com.agentasker.core.navigation.Screen
+import com.agentasker.core.network.NetworkMonitor
+import com.agentasker.core.ui.components.OfflineBanner
 import com.agentasker.core.ui.theme.AgenTaskerTheme
 import com.agentasker.features.classroom.data.services.ClassroomAuthService
 import com.agentasker.features.classroom.presentation.screens.ClassroomScreen
@@ -44,25 +46,36 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var classroomAuthService: ClassroomAuthService
 
+    @Inject
+    lateinit var networkMonitor: NetworkMonitor
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
         setContent {
             AgenTaskerTheme {
-                AgentTaskerApp(classroomAuthService = classroomAuthService)
+                AgentTaskerApp(
+                    classroomAuthService = classroomAuthService,
+                    networkMonitor = networkMonitor
+                )
             }
         }
     }
 }
 
 @Composable
-fun AgentTaskerApp(classroomAuthService: ClassroomAuthService) {
+fun AgentTaskerApp(
+    classroomAuthService: ClassroomAuthService,
+    networkMonitor: NetworkMonitor
+) {
     val navController = rememberNavController()
     val navigatorWrapper = remember { NavigatorWrapper(navController) }
 
     val loginViewModel: LoginViewModel = hiltViewModel()
     val loginUiState by loginViewModel.uiState.collectAsStateWithLifecycle()
+
+    val isOnline by networkMonitor.isOnline.collectAsStateWithLifecycle(initialValue = true)
 
     val startDestination = if (loginUiState.isAuthenticated) {
         Screen.Dashboard.route
@@ -84,7 +97,7 @@ fun AgentTaskerApp(classroomAuthService: ClassroomAuthService) {
         }
 
         composable(Screen.Dashboard.route) {
-            MainScaffold(navController = navController, currentRoute = Screen.Dashboard.route) {
+            MainScaffold(navController = navController, currentRoute = Screen.Dashboard.route, isOffline = !isOnline) {
                 DashboardScreen(
                     onNavigateToTasks = {
                         navController.navigate(Screen.Tasks.route) {
@@ -105,13 +118,13 @@ fun AgentTaskerApp(classroomAuthService: ClassroomAuthService) {
         }
 
         composable(Screen.Tasks.route) {
-            MainScaffold(navController = navController, currentRoute = Screen.Tasks.route) {
+            MainScaffold(navController = navController, currentRoute = Screen.Tasks.route, isOffline = !isOnline) {
                 TaskScreen()
             }
         }
 
         composable(Screen.Classroom.route) {
-            MainScaffold(navController = navController, currentRoute = Screen.Classroom.route) {
+            MainScaffold(navController = navController, currentRoute = Screen.Classroom.route, isOffline = !isOnline) {
                 ClassroomScreen(classroomAuthService = classroomAuthService)
             }
         }
@@ -122,6 +135,7 @@ fun AgentTaskerApp(classroomAuthService: ClassroomAuthService) {
 fun MainScaffold(
     navController: NavHostController,
     currentRoute: String,
+    isOffline: Boolean = false,
     content: @Composable () -> Unit
 ) {
     Scaffold(
@@ -171,8 +185,11 @@ fun MainScaffold(
             }
         }
     ) { innerPadding ->
-        Box(modifier = Modifier.padding(innerPadding)) {
-            content()
+        Column(modifier = Modifier.padding(innerPadding)) {
+            OfflineBanner(isOffline = isOffline)
+            Box(modifier = Modifier.weight(1f)) {
+                content()
+            }
         }
     }
 }
