@@ -4,7 +4,11 @@ import {
   PrimaryGeneratedColumn,
   CreateDateColumn,
   UpdateDateColumn,
+  OneToOne,
+  OneToMany,
 } from 'typeorm';
+import { ClassroomData } from '../../classroom/entities/classroom-data.entity';
+import { Task } from '../../tasks/entities/task.entity';
 
 @Entity('users')
 export class User {
@@ -31,6 +35,15 @@ export class User {
 
   @Column({ default: false })
   emailVerified: boolean;
+
+  @Column({ type: 'varchar', nullable: true })
+  refreshToken: string | null;
+
+  @OneToOne(() => ClassroomData, (cd) => cd.user)
+  classroomData: ClassroomData;
+
+  @OneToMany(() => Task, (task) => task.user)
+  tasks: Task[];
 
   @CreateDateColumn()
   createdAt: Date;

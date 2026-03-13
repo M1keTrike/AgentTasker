@@ -17,3 +17,6 @@
 
 android-app/app/google-sevices-json
 **/google-services.json
+.claude/
+
+*.patch

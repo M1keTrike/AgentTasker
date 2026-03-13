@@ -1,7 +1,7 @@
 package com.agentasker.features.login.data.repositories
 
 import com.agentasker.core.network.AgentTaskerApi
-import com.agentasker.features.login.data.datasources.local.SecureTokenStorage
+import com.agentasker.features.login.data.datasources.local.SecureDataStoreTokenStorage
 import com.agentasker.features.login.data.datasources.remote.mapper.toDomain
 import com.agentasker.features.login.data.datasources.remote.mapper.toDomainFromLogin
 import com.agentasker.features.login.data.datasources.remote.model.GoogleSignInRequestDTO
@@ -10,34 +10,26 @@ import com.agentasker.features.login.data.datasources.remote.model.RegisterReque
 import com.agentasker.features.login.domain.entities.AuthToken
 import com.agentasker.features.login.domain.entities.User
 import com.agentasker.features.login.domain.repositories.AuthRepository
+import javax.inject.Inject
 
-class AuthRepositoryImpl(
+class AuthRepositoryImpl @Inject constructor(
     private val api: AgentTaskerApi,
-    private val secureStorage: SecureTokenStorage
+    private val secureStorage: SecureDataStoreTokenStorage
 ) : AuthRepository {
 
     override suspend fun signInWithGoogle(idToken: String): Result<User> {
         return try {
-            android.util.Log.d("AuthRepositoryImpl", "Enviando idToken al backend...")
-
             val request = GoogleSignInRequestDTO(idToken = idToken)
             val response = api.signInWithGoogle(request)
-
-            android.util.Log.d("AuthRepositoryImpl", "Respuesta del backend recibida")
 
             val user = response.user.toDomain()
             val token = response.token.toDomain()
 
-            android.util.Log.d("AuthRepositoryImpl", "Guardando tokens y usuario en almacenamiento seguro")
-
             secureStorage.saveAuthToken(token)
             secureStorage.saveUser(user)
 
-            android.util.Log.d("AuthRepositoryImpl", "Usuario guardado: ${user.email}")
-
             Result.success(user)
         } catch (e: Exception) {
-            android.util.Log.e("AuthRepositoryImpl", "Error al sincronizar con backend", e)
             Result.failure(e)
         }
     }
@@ -51,8 +43,8 @@ class AuthRepositoryImpl(
             val token = AuthToken(
                 accessToken = response.accessToken,
                 idToken = null,
-                refreshToken = null,
-                expiresIn = 86400L
+                refreshToken = response.refreshToken,
+                expiresIn = response.expiresIn ?: 86400L
             )
 
             secureStorage.saveAuthToken(token)
@@ -100,4 +92,3 @@ class AuthRepositoryImpl(
         return user != null && tokenValid
     }
 }
-

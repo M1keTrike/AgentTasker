@@ -1,8 +1,9 @@
 package com.agentasker.features.tasks.domain.usecases
 
 import com.agentasker.features.tasks.domain.repositories.TaskRepository
+import javax.inject.Inject
 
-class DeleteTaskUseCase(
+class DeleteTaskUseCase @Inject constructor(
     private val taskRepository: TaskRepository
 ) {
     suspend operator fun invoke(id: String): Result<Unit> {

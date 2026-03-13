@@ -1,12 +1,22 @@
 package com.agentasker.core.network
 
+import com.agentasker.features.classroom.data.datasources.remote.model.ClassroomConnectRequestDTO
+import com.agentasker.features.classroom.data.datasources.remote.model.ClassroomCourseDTO
+import com.agentasker.features.classroom.data.datasources.remote.model.ClassroomStatusDTO
+import com.agentasker.features.classroom.data.datasources.remote.model.ClassroomTaskDTO
 import com.agentasker.features.login.data.datasources.remote.model.AuthResponseDTO
 import com.agentasker.features.login.data.datasources.remote.model.GoogleSignInRequestDTO
 import com.agentasker.features.login.data.datasources.remote.model.LoginRequestDTO
 import com.agentasker.features.login.data.datasources.remote.model.LoginResponseDTO
 import com.agentasker.features.login.data.datasources.remote.model.ProfileResponseDTO
+import com.agentasker.features.login.data.datasources.remote.model.RefreshTokenRequestDTO
+import com.agentasker.features.login.data.datasources.remote.model.RefreshTokenResponseDTO
 import com.agentasker.features.login.data.datasources.remote.model.RegisterRequestDTO
 import com.agentasker.features.login.data.datasources.remote.model.RegisterResponseDTO
+import com.agentasker.features.kanban.data.datasources.remote.model.CreateKanbanColumnRequest
+import com.agentasker.features.kanban.data.datasources.remote.model.KanbanColumnDTO
+import com.agentasker.features.kanban.data.datasources.remote.model.ReorderKanbanColumnsRequest
+import com.agentasker.features.kanban.data.datasources.remote.model.UpdateKanbanColumnRequest
 import com.agentasker.features.tasks.data.datasources.remote.model.CreateTaskRequest
 import com.agentasker.features.tasks.data.datasources.remote.model.TaskDTO
 import com.agentasker.features.tasks.data.datasources.remote.model.TaskResponse
@@ -50,6 +60,39 @@ interface AgentTaskerApi {
 
     @GET("users/profile")
     suspend fun getProfile(): ProfileResponseDTO
+
+    @POST("auth/refresh")
+    suspend fun refreshToken(@Body request: RefreshTokenRequestDTO): RefreshTokenResponseDTO
+
+    @POST("auth/google-classroom")
+    suspend fun connectClassroom(@Body request: ClassroomConnectRequestDTO): AuthResponseDTO
+
+    @GET("classroom/courses")
+    suspend fun getClassroomCourses(): List<ClassroomCourseDTO>
+
+    @GET("classroom/courses/{courseId}/tasks")
+    suspend fun getClassroomTasksByCourse(@Path("courseId") courseId: String): List<ClassroomTaskDTO>
+
+    @GET("classroom/tasks")
+    suspend fun getAllClassroomTasks(): List<ClassroomTaskDTO>
+
+    @GET("classroom/status")
+    suspend fun getClassroomStatus(): ClassroomStatusDTO
+
+    @GET("kanban/columns")
+    suspend fun getKanbanColumns(): List<KanbanColumnDTO>
+
+    @POST("kanban/columns")
+    suspend fun createKanbanColumn(@Body request: CreateKanbanColumnRequest): KanbanColumnDTO
+
+    @PATCH("kanban/columns/{id}")
+    suspend fun updateKanbanColumn(@Path("id") id: Int, @Body request: UpdateKanbanColumnRequest): KanbanColumnDTO
+
+    @DELETE("kanban/columns/{id}")
+    suspend fun deleteKanbanColumn(@Path("id") id: Int): Response<Unit>
+
+    @PATCH("kanban/columns/reorder")
+    suspend fun reorderKanbanColumns(@Body request: ReorderKanbanColumnsRequest): List<KanbanColumnDTO>
 
 }
 

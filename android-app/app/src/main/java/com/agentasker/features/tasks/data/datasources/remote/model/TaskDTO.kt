@@ -13,6 +13,10 @@ data class TaskDTO(
     val description: String,
     @SerializedName("priority")
     val priority: String,
+    @SerializedName("status")
+    val status: String = "pending",
+    @SerializedName("dueDate")
+    val dueDate: String? = null,
     @SerializedName("createdAt")
     val createdAt: String?,
     @SerializedName("updatedAt")
@@ -25,7 +29,11 @@ data class CreateTaskRequest(
     @SerializedName("description")
     val description: String,
     @SerializedName("priority")
-    val priority: String = "medium"
+    val priority: String = "medium",
+    @SerializedName("status")
+    val status: String = "pending",
+    @SerializedName("dueDate")
+    val dueDate: String? = null
 )
 
 data class UpdateTaskRequest(
@@ -34,7 +42,11 @@ data class UpdateTaskRequest(
     @SerializedName("description")
     val description: String?,
     @SerializedName("priority")
-    val priority: String?
+    val priority: String?,
+    @SerializedName("status")
+    val status: String? = null,
+    @SerializedName("dueDate")
+    val dueDate: String? = null
 )
 
 data class SubtaskDTO(
