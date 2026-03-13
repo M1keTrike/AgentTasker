@@ -18,4 +18,9 @@
     <string name="priority_high">Alta</string>
     <string name="priority_medium">Media</string>
     <string name="priority_low">Baja</string>
+
+    <string name="task_field_reminder">Recordarme</string>
+    <string name="task_reminder_none">Sin recordatorio</string>
+    <string name="notification_channel_tasks">Recordatorios de tareas</string>
+    <string name="notification_channel_classroom">Tareas de Classroom</string>
 </resources>

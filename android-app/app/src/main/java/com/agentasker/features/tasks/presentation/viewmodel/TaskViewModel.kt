@@ -3,6 +3,7 @@ package com.agentasker.features.tasks.presentation.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.agentasker.core.hardware.HapticFeedbackManager
+import com.agentasker.core.hardware.ReminderScheduler
 import com.agentasker.features.tasks.domain.entities.Task
 import com.agentasker.features.tasks.domain.usecases.CreateTaskUseCase
 import com.agentasker.features.tasks.domain.usecases.DeleteTaskUseCase
@@ -24,7 +25,8 @@ class TaskViewModel @Inject constructor(
     private val createTaskUseCase: CreateTaskUseCase,
     private val updateTaskUseCase: UpdateTaskUseCase,
     private val deleteTaskUseCase: DeleteTaskUseCase,
-    private val hapticFeedbackManager: HapticFeedbackManager
+    private val hapticFeedbackManager: HapticFeedbackManager,
+    private val reminderScheduler: ReminderScheduler
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(TaskUiState())
@@ -73,13 +75,20 @@ class TaskViewModel @Inject constructor(
         refreshTasks()
     }
 
-    fun createTask(title: String, description: String, priority: String) {
+    fun createTask(title: String, description: String, priority: String, reminderAt: Long? = null) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
 
             createTaskUseCase(title, description, priority).fold(
-                onSuccess = {
-                    // Room Flow auto-updates UI
+                onSuccess = { task ->
+                    if (reminderAt != null) {
+                        reminderScheduler.scheduleReminder(
+                            taskId = task.id,
+                            title = "Recordatorio: $title",
+                            body = description,
+                            triggerAtMillis = reminderAt
+                        )
+                    }
                 },
                 onFailure = { exception ->
                     _uiState.value = _uiState.value.copy(
@@ -91,13 +100,22 @@ class TaskViewModel @Inject constructor(
         }
     }
 
-    fun updateTask(id: String, title: String?, description: String?, priority: String?) {
+    fun updateTask(id: String, title: String?, description: String?, priority: String?, reminderAt: Long? = null) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
 
             updateTaskUseCase(id, title, description, priority).fold(
                 onSuccess = {
                     hapticFeedbackManager.success()
+                    reminderScheduler.cancelReminder(id)
+                    if (reminderAt != null) {
+                        reminderScheduler.scheduleReminder(
+                            taskId = id,
+                            title = "Recordatorio: ${title ?: "Tarea"}",
+                            body = description ?: "",
+                            triggerAtMillis = reminderAt
+                        )
+                    }
                 },
                 onFailure = { exception ->
                     _uiState.value = _uiState.value.copy(
@@ -116,6 +134,7 @@ class TaskViewModel @Inject constructor(
             deleteTaskUseCase(id).fold(
                 onSuccess = {
                     hapticFeedbackManager.warning()
+                    reminderScheduler.cancelReminder(id)
                 },
                 onFailure = { exception ->
                     _uiState.value = _uiState.value.copy(
@@ -136,7 +155,8 @@ class TaskViewModel @Inject constructor(
             taskToEdit = null,
             formTitle = "",
             formDescription = "",
-            formPriority = "medium"
+            formPriority = "medium",
+            formReminderAt = null
         )
     }
 
@@ -146,7 +166,8 @@ class TaskViewModel @Inject constructor(
             taskToEdit = task,
             formTitle = task.title,
             formDescription = task.description,
-            formPriority = task.priority
+            formPriority = task.priority,
+            formReminderAt = task.reminderAt
         )
     }
 
@@ -156,7 +177,8 @@ class TaskViewModel @Inject constructor(
             taskToEdit = null,
             formTitle = "",
             formDescription = "",
-            formPriority = "medium"
+            formPriority = "medium",
+            formReminderAt = null
         )
     }
 
@@ -170,5 +192,9 @@ class TaskViewModel @Inject constructor(
 
     fun updateFormPriority(priority: String) {
         _uiState.value = _uiState.value.copy(formPriority = priority)
+    }
+
+    fun updateFormReminderAt(reminderAt: Long?) {
+        _uiState.value = _uiState.value.copy(formReminderAt = reminderAt)
     }
 }

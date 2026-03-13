@@ -39,4 +39,7 @@ interface TaskDao {
 
     @Query("DELETE FROM tasks")
     suspend fun clearAll()
+
+    @Query("SELECT * FROM tasks WHERE reminderAt IS NOT NULL AND reminderAt > :currentTime")
+    suspend fun getTasksWithReminders(currentTime: Long = System.currentTimeMillis()): List<TaskEntity>
 }

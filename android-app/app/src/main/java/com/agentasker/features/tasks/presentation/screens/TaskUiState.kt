@@ -10,6 +10,7 @@ data class TaskUiState(
     val taskToEdit: Task? = null,
     val formTitle: String = "",
     val formDescription: String = "",
-    val formPriority: String = "medium"
+    val formPriority: String = "medium",
+    val formReminderAt: Long? = null
 )
 

@@ -12,5 +12,6 @@ data class TaskEntity(
     val priority: String,
     val createdAt: String? = null,
     val updatedAt: String? = null,
-    val isSynced: Boolean = true
+    val isSynced: Boolean = true,
+    val reminderAt: Long? = null
 )
