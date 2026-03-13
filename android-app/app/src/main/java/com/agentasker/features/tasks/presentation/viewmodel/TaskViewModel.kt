@@ -2,6 +2,7 @@ package com.agentasker.features.tasks.presentation.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.agentasker.core.hardware.HapticFeedbackManager
 import com.agentasker.features.tasks.domain.entities.Task
 import com.agentasker.features.tasks.domain.usecases.CreateTaskUseCase
 import com.agentasker.features.tasks.domain.usecases.DeleteTaskUseCase
@@ -22,7 +23,8 @@ class TaskViewModel @Inject constructor(
     private val getTasksUseCase: GetTasksUseCase,
     private val createTaskUseCase: CreateTaskUseCase,
     private val updateTaskUseCase: UpdateTaskUseCase,
-    private val deleteTaskUseCase: DeleteTaskUseCase
+    private val deleteTaskUseCase: DeleteTaskUseCase,
+    private val hapticFeedbackManager: HapticFeedbackManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(TaskUiState())
@@ -95,7 +97,7 @@ class TaskViewModel @Inject constructor(
 
             updateTaskUseCase(id, title, description, priority).fold(
                 onSuccess = {
-                    // Room Flow auto-updates UI
+                    hapticFeedbackManager.success()
                 },
                 onFailure = { exception ->
                     _uiState.value = _uiState.value.copy(
@@ -113,7 +115,7 @@ class TaskViewModel @Inject constructor(
 
             deleteTaskUseCase(id).fold(
                 onSuccess = {
-                    // Room Flow auto-updates UI
+                    hapticFeedbackManager.warning()
                 },
                 onFailure = { exception ->
                     _uiState.value = _uiState.value.copy(

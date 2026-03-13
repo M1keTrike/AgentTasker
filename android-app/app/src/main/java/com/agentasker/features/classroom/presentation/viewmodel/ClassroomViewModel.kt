@@ -2,6 +2,7 @@ package com.agentasker.features.classroom.presentation.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.agentasker.core.hardware.HapticFeedbackManager
 import com.agentasker.features.classroom.domain.entities.ClassroomCourse
 import com.agentasker.features.classroom.domain.entities.ClassroomTask
 import com.agentasker.features.classroom.domain.usecases.ConnectClassroomUseCase
@@ -31,7 +32,8 @@ class ClassroomViewModel @Inject constructor(
     private val getCoursesUseCase: GetClassroomCoursesUseCase,
     private val getTasksUseCase: GetClassroomTasksUseCase,
     private val connectClassroomUseCase: ConnectClassroomUseCase,
-    private val secureTokenStorage: SecureDataStoreTokenStorage
+    private val secureTokenStorage: SecureDataStoreTokenStorage,
+    private val hapticFeedbackManager: HapticFeedbackManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ClassroomUiState())
@@ -80,6 +82,9 @@ class ClassroomViewModel @Inject constructor(
             getTasksUseCase().fold(
                 onSuccess = { tasks ->
                     _uiState.value = _uiState.value.copy(tasks = tasks)
+                    if (tasks.isNotEmpty()) {
+                        hapticFeedbackManager.notification()
+                    }
                 },
                 onFailure = { error ->
                     _uiState.value = _uiState.value.copy(
