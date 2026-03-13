@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import com.agentasker.core.database.AppDatabase
 import com.agentasker.features.classroom.data.datasources.local.dao.ClassroomTaskDao
+import com.agentasker.features.tasks.data.datasources.local.dao.TaskDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -22,11 +23,18 @@ object DatabaseModule {
             context,
             AppDatabase::class.java,
             "agentasker_database"
-        ).build()
+        )
+            .fallbackToDestructiveMigration()
+            .build()
     }
 
     @Provides
     fun provideClassroomTaskDao(database: AppDatabase): ClassroomTaskDao {
         return database.classroomTaskDao()
+    }
+
+    @Provides
+    fun provideTaskDao(database: AppDatabase): TaskDao {
+        return database.taskDao()
     }
 }

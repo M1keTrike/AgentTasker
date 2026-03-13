@@ -2,26 +2,21 @@ package com.agentasker.features.tasks.domain.usecases
 
 import com.agentasker.features.tasks.domain.entities.Task
 import com.agentasker.features.tasks.domain.repositories.TaskRepository
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 
 class GetTasksUseCase @Inject constructor(
     private val repository: TaskRepository
 ) {
 
-    suspend operator fun invoke(): Result<List<Task>> {
-        return try {
-            val tasks = repository.getTasks()
-
-            val filteredTasks = tasks.filter { it.title.isNotBlank() }
-
-            if (filteredTasks.isEmpty()) {
-                Result.failure(Exception("No se encontraron tareas válidas"))
-            } else {
-                Result.success(filteredTasks)
-            }
-        } catch (e: Exception) {
-            Result.failure(e)
+    operator fun invoke(): Flow<List<Task>> {
+        return repository.observeTasks().map { tasks ->
+            tasks.filter { it.title.isNotBlank() }
         }
     }
-}
 
+    suspend fun refresh() {
+        repository.refreshTasks()
+    }
+}

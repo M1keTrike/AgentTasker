@@ -12,6 +12,8 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -27,29 +29,46 @@ class TaskViewModel @Inject constructor(
     val uiState: StateFlow<TaskUiState> = _uiState.asStateFlow()
 
     init {
-        loadTasks()
+        observeTasks()
+        refreshTasks()
     }
 
-    fun loadTasks() {
+    private fun observeTasks() {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
-
-            getTasksUseCase().fold(
-                onSuccess = { tasks ->
+            getTasksUseCase()
+                .onStart {
+                    _uiState.value = _uiState.value.copy(isLoading = true)
+                }
+                .catch { e ->
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        error = e.message ?: "Error al cargar las tareas"
+                    )
+                }
+                .collect { tasks ->
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         tasks = tasks,
                         error = null
                     )
-                },
-                onFailure = { exception ->
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        error = exception.message ?: "Error al cargar las tareas"
-                    )
                 }
-            )
         }
+    }
+
+    private fun refreshTasks() {
+        viewModelScope.launch {
+            try {
+                getTasksUseCase.refresh()
+            } catch (_: Exception) {
+                // Offline: Room Flow already provides cached data
+            } finally {
+                _uiState.value = _uiState.value.copy(isLoading = false)
+            }
+        }
+    }
+
+    fun loadTasks() {
+        refreshTasks()
     }
 
     fun createTask(title: String, description: String, priority: String) {
@@ -58,7 +77,7 @@ class TaskViewModel @Inject constructor(
 
             createTaskUseCase(title, description, priority).fold(
                 onSuccess = {
-                    loadTasks()
+                    // Room Flow auto-updates UI
                 },
                 onFailure = { exception ->
                     _uiState.value = _uiState.value.copy(
@@ -74,34 +93,13 @@ class TaskViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
 
-
-            val currentTasks = _uiState.value.tasks
-            val updatedTasks = currentTasks.map { task ->
-                if (task.id == id) {
-                    task.copy(
-                        title = title ?: task.title,
-                        description = description ?: task.description,
-                        priority = priority ?: task.priority
-                    )
-                } else {
-                    task
-                }
-            }
-            _uiState.value = _uiState.value.copy(
-                tasks = updatedTasks,
-                isLoading = false
-            )
-
             updateTaskUseCase(id, title, description, priority).fold(
                 onSuccess = {
-
-                    loadTasks()
+                    // Room Flow auto-updates UI
                 },
                 onFailure = { exception ->
-
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
-                        tasks = currentTasks,
                         error = exception.message ?: "Error al actualizar la tarea"
                     )
                 }
@@ -113,21 +111,12 @@ class TaskViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(error = null)
 
-
-            val currentTasks = _uiState.value.tasks
-            _uiState.value = _uiState.value.copy(
-                tasks = currentTasks.filter { it.id != id }
-            )
-
             deleteTaskUseCase(id).fold(
                 onSuccess = {
-
-                    loadTasks()
+                    // Room Flow auto-updates UI
                 },
                 onFailure = { exception ->
-
                     _uiState.value = _uiState.value.copy(
-                        tasks = currentTasks,
                         error = exception.message ?: "Error al eliminar la tarea"
                     )
                 }
