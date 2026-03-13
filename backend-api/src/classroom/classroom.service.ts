@@ -85,7 +85,6 @@ export class ClassroomService {
     courseId: string,
     courseName?: string,
   ): Promise<ClassroomTaskDto[]> {
-    // Get coursework
     const courseWorkData = await this.authenticatedRequest<{
       courseWork?: Array<{
         id: string;
@@ -100,7 +99,6 @@ export class ClassroomService {
 
     const courseWorkItems = courseWorkData.courseWork ?? [];
 
-    // Get student submissions for each coursework
     const tasks: ClassroomTaskDto[] = [];
 
     for (const cw of courseWorkItems) {
@@ -116,9 +114,7 @@ export class ClassroomService {
         if (submData.studentSubmissions?.length) {
           submissionState = submData.studentSubmissions[0].state;
         }
-      } catch {
-        // If submissions fail, default to NEW
-      }
+      } catch { }
 
       let dueDate: string | undefined;
       if (cw.dueDate) {

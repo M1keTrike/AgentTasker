@@ -49,12 +49,8 @@ fun LoginScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
 
-    android.util.Log.d("LoginScreen", "LoginScreen recomposed - isAuthenticated: ${uiState.isAuthenticated}")
-
     LaunchedEffect(uiState.isAuthenticated) {
-        android.util.Log.d("LoginScreen", "LaunchedEffect - isAuthenticated: ${uiState.isAuthenticated}")
         if (uiState.isAuthenticated) {
-            android.util.Log.d("LoginScreen", "Llamando a onLoginSuccess()")
             onLoginSuccess()
         }
     }

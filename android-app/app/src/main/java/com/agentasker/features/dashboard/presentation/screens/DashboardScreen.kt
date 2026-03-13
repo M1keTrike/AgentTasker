@@ -107,7 +107,6 @@ private fun DashboardContent(
     ) {
         item { Spacer(modifier = Modifier.height(4.dp)) }
 
-        // Resumen rápido
         item {
             SummarySection(
                 pendingCount = state.pendingCount,
@@ -117,7 +116,6 @@ private fun DashboardContent(
             )
         }
 
-        // Próximas entregas
         item {
             DashboardCard(
                 title = "Próximas entregas",
@@ -140,7 +138,6 @@ private fun DashboardContent(
             }
         }
 
-        // Tareas por prioridad
         item {
             DashboardCard(
                 title = "Tareas por prioridad",
@@ -156,7 +153,6 @@ private fun DashboardContent(
             }
         }
 
-        // Estado de Classroom
         item {
             DashboardCard(
                 title = "Estado de Classroom",

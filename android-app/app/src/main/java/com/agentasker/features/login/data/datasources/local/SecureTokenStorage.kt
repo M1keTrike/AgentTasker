@@ -2,7 +2,6 @@ package com.agentasker.features.login.data.datasources.local
 
 import android.content.Context
 import android.content.SharedPreferences
-import android.util.Log
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.agentasker.features.login.domain.entities.AuthToken
@@ -30,7 +29,6 @@ class SecureTokenStorage(private val context: Context) {
                 EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
             )
         } catch (e: GeneralSecurityException) {
-            Log.e(TAG, "Error al crear EncryptedSharedPreferences (datos corruptos), limpiando...", e)
             deleteCorruptedPreferences()
 
 
@@ -42,8 +40,6 @@ class SecureTokenStorage(private val context: Context) {
                 EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
             )
         } catch (e: Exception) {
-            Log.e(TAG, "Error inesperado al crear EncryptedSharedPreferences", e)
-
             deleteCorruptedPreferences()
             EncryptedSharedPreferences.create(
                 context,
@@ -62,17 +58,14 @@ class SecureTokenStorage(private val context: Context) {
             val prefsFile = prefsDir.resolve("$PREFS_NAME.xml")
 
             if (prefsFile.exists()) {
-                val deleted = prefsFile.delete()
-                Log.d(TAG, "Archivo de preferencias eliminado: $deleted (${prefsFile.absolutePath})")
+                prefsFile.delete()
             }
 
             val masterKeyFile = prefsDir.resolve("${PREFS_NAME}_master_key.xml")
             if (masterKeyFile.exists()) {
-                val deleted = masterKeyFile.delete()
-                Log.d(TAG, "Archivo de master key eliminado: $deleted (${masterKeyFile.absolutePath})")
+                masterKeyFile.delete()
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error al eliminar archivos corruptos", e)
         }
     }
 
@@ -141,7 +134,6 @@ class SecureTokenStorage(private val context: Context) {
     }
 
     companion object {
-        private const val TAG = "SecureTokenStorage"
         private const val PREFS_NAME = "auth_secure_prefs"
 
         private const val KEY_ACCESS_TOKEN = "access_token"

@@ -37,7 +37,6 @@ class ConnectivityManagerNetworkMonitor @Inject constructor(
 
         connectivityManager.registerNetworkCallback(request, callback)
 
-        // Estado inicial
         val currentNetwork = connectivityManager.activeNetwork
         val isConnected = connectivityManager.getNetworkCapabilities(currentNetwork)
             ?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true

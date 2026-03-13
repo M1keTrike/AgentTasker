@@ -64,7 +64,6 @@ interface AgentTaskerApi {
     @POST("auth/refresh")
     suspend fun refreshToken(@Body request: RefreshTokenRequestDTO): RefreshTokenResponseDTO
 
-    // Classroom endpoints
     @POST("auth/google-classroom")
     suspend fun connectClassroom(@Body request: ClassroomConnectRequestDTO): AuthResponseDTO
 
@@ -80,7 +79,6 @@ interface AgentTaskerApi {
     @GET("classroom/status")
     suspend fun getClassroomStatus(): ClassroomStatusDTO
 
-    // Kanban endpoints
     @GET("kanban/columns")
     suspend fun getKanbanColumns(): List<KanbanColumnDTO>
 

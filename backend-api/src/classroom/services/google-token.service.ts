@@ -1,4 +1,3 @@
-/* eslint-disable prettier/prettier */
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -57,7 +56,6 @@ export class GoogleTokenService {
     };
 
     if (existing) {
-      // Only update refresh token if a new one was provided
       if (!tokens.refreshToken) {
         delete (tokenData as Record<string, unknown>).googleRefreshToken;
       }
@@ -78,7 +76,6 @@ export class GoogleTokenService {
       );
     }
 
-    // Check if token is still valid (with 5-minute buffer)
     if (
       classroomData.googleTokenExpiresAt &&
       classroomData.googleTokenExpiresAt.getTime() > Date.now() + 5 * 60 * 1000
@@ -86,7 +83,6 @@ export class GoogleTokenService {
       return classroomData.googleAccessToken;
     }
 
-    // Token expired — refresh it
     if (!classroomData.googleRefreshToken) {
       throw new UnauthorizedException(
         'Google Classroom token expired and no refresh token available. Please re-authorize.',
