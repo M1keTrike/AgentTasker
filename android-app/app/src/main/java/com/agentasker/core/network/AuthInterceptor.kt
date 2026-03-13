@@ -1,19 +1,19 @@
 package com.agentasker.core.network
 
-import com.agentasker.features.login.data.datasources.local.SecureTokenStorage
+import com.agentasker.features.login.data.datasources.local.SecureDataStoreTokenStorage
 import okhttp3.Interceptor
 import okhttp3.Response
 
 class AuthInterceptor(
-    private val tokenStorage: SecureTokenStorage
+    private val tokenStorage: SecureDataStoreTokenStorage
 ) : Interceptor {
 
     override fun intercept(chain: Interceptor.Chain): Response {
-        val token = tokenStorage.getAuthToken()
+        val accessToken = tokenStorage.getCachedAccessToken()
 
-        val request = if (token != null && tokenStorage.isTokenValid()) {
+        val request = if (accessToken != null) {
             chain.request().newBuilder()
-                .addHeader("Authorization", "Bearer ${token.accessToken}")
+                .addHeader("Authorization", "Bearer $accessToken")
                 .build()
         } else {
             chain.request()
@@ -22,4 +22,3 @@ class AuthInterceptor(
         return chain.proceed(request)
     }
 }
-

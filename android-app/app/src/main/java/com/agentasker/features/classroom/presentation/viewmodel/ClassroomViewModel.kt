@@ -7,7 +7,7 @@ import com.agentasker.features.classroom.domain.entities.ClassroomTask
 import com.agentasker.features.classroom.domain.usecases.ConnectClassroomUseCase
 import com.agentasker.features.classroom.domain.usecases.GetClassroomCoursesUseCase
 import com.agentasker.features.classroom.domain.usecases.GetClassroomTasksUseCase
-import com.agentasker.features.login.data.datasources.local.SecureTokenStorage
+import com.agentasker.features.login.data.datasources.local.SecureDataStoreTokenStorage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -31,7 +31,7 @@ class ClassroomViewModel @Inject constructor(
     private val getCoursesUseCase: GetClassroomCoursesUseCase,
     private val getTasksUseCase: GetClassroomTasksUseCase,
     private val connectClassroomUseCase: ConnectClassroomUseCase,
-    private val secureTokenStorage: SecureTokenStorage
+    private val secureTokenStorage: SecureDataStoreTokenStorage
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ClassroomUiState())
