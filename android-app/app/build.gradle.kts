@@ -7,6 +7,7 @@ plugins {
     alias(libs.plugins.google.gms.google.services)
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -86,6 +87,9 @@ dependencies {
 
     // Navigation
     implementation(libs.androidx.navigation.compose)
+
+    // Kotlin Serialization (type-safe navigation)
+    implementation(libs.kotlinx.serialization.json)
 
     // Networking
     implementation(libs.retrofit)
