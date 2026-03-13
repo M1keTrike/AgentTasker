@@ -1,5 +1,9 @@
 package com.agentasker.features.tasks.presentation.screens
 
+import android.Manifest
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -39,6 +43,16 @@ fun TaskScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
+    // Request notification permission on Android 13+
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { /* Permission result handled silently */ }
+
+    LaunchedEffect(Unit) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
 
     LaunchedEffect(uiState.error) {
         uiState.error?.let { error ->
@@ -53,17 +67,19 @@ fun TaskScreen(
             title = uiState.formTitle,
             description = uiState.formDescription,
             priority = uiState.formPriority,
+            reminderAt = uiState.formReminderAt,
             onTitleChange = viewModel::updateFormTitle,
             onDescriptionChange = viewModel::updateFormDescription,
             onPriorityChange = viewModel::updateFormPriority,
+            onReminderAtChange = viewModel::updateFormReminderAt,
             onDismiss = {
                 viewModel.hideDialog()
             },
-            onSave = { title, description, priority ->
+            onSave = { title, description, priority, reminderAt ->
                 if (uiState.taskToEdit != null) {
-                    viewModel.updateTask(uiState.taskToEdit!!.id, title, description, priority)
+                    viewModel.updateTask(uiState.taskToEdit!!.id, title, description, priority, reminderAt)
                 } else {
-                    viewModel.createTask(title, description, priority)
+                    viewModel.createTask(title, description, priority, reminderAt)
                 }
                 viewModel.hideDialog()
             }
