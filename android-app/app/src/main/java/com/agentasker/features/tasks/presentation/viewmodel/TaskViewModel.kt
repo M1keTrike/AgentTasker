@@ -78,11 +78,11 @@ class TaskViewModel @Inject constructor(
         refreshTasks()
     }
 
-    fun createTask(title: String, description: String, priority: String, reminderAt: Long? = null) {
+    fun createTask(title: String, description: String, priority: String, status: String = "pending", dueDate: String? = null, reminderAt: Long? = null) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
 
-            createTaskUseCase(title, description, priority).fold(
+            createTaskUseCase(title, description, priority, status, dueDate).fold(
                 onSuccess = { task ->
                     if (reminderAt != null) {
                         taskReminderDao.upsertReminder(
@@ -111,11 +111,11 @@ class TaskViewModel @Inject constructor(
         }
     }
 
-    fun updateTask(id: String, title: String?, description: String?, priority: String?, reminderAt: Long? = null) {
+    fun updateTask(id: String, title: String?, description: String?, priority: String?, status: String? = null, dueDate: String? = null, reminderAt: Long? = null) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
 
-            updateTaskUseCase(id, title, description, priority).fold(
+            updateTaskUseCase(id, title, description, priority, status, dueDate).fold(
                 onSuccess = {
                     hapticFeedbackManager.success()
                     // Siempre limpiar reminder anterior
@@ -179,6 +179,8 @@ class TaskViewModel @Inject constructor(
             formTitle = "",
             formDescription = "",
             formPriority = "medium",
+            formStatus = "pending",
+            formDueDate = null,
             formReminderAt = null
         )
     }
@@ -190,6 +192,8 @@ class TaskViewModel @Inject constructor(
             formTitle = task.title,
             formDescription = task.description,
             formPriority = task.priority,
+            formStatus = task.status,
+            formDueDate = task.dueDate,
             formReminderAt = null // Se cargará async desde task_reminders
         )
         // Cargar reminder desde tabla local
@@ -208,8 +212,18 @@ class TaskViewModel @Inject constructor(
             formTitle = "",
             formDescription = "",
             formPriority = "medium",
+            formStatus = "pending",
+            formDueDate = null,
             formReminderAt = null
         )
+    }
+
+    fun updateFormStatus(status: String) {
+        _uiState.value = _uiState.value.copy(formStatus = status)
+    }
+
+    fun updateFormDueDate(dueDate: String?) {
+        _uiState.value = _uiState.value.copy(formDueDate = dueDate)
     }
 
     fun updateFormTitle(title: String) {

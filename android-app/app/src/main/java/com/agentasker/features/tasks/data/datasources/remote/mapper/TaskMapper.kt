@@ -10,6 +10,8 @@ fun TaskDTO.toDomain(): Task {
         title = title,
         description = description,
         priority = priority,
+        status = status,
+        dueDate = dueDate,
         createdAt = createdAt,
         updatedAt = updatedAt
     )

@@ -7,9 +7,9 @@ import javax.inject.Inject
 class CreateTaskUseCase @Inject constructor(
     private val taskRepository: TaskRepository
 ) {
-    suspend operator fun invoke(title: String, description: String, priority: String): Result<Task> {
+    suspend operator fun invoke(title: String, description: String, priority: String, status: String = "pending", dueDate: String? = null): Result<Task> {
         return try {
-            val task = taskRepository.createTask(title, description, priority)
+            val task = taskRepository.createTask(title, description, priority, status, dueDate)
             Result.success(task)
         } catch (e: Exception) {
             Result.failure(e)

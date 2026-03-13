@@ -8,7 +8,7 @@ interface TaskRepository {
     suspend fun refreshTasks()
     suspend fun getTasks(): List<Task>
     suspend fun getTaskById(id: String): Task
-    suspend fun createTask(title: String, description: String, priority: String): Task
-    suspend fun updateTask(id: String, title: String?, description: String?, priority: String?): Task
+    suspend fun createTask(title: String, description: String, priority: String, status: String = "pending", dueDate: String? = null): Task
+    suspend fun updateTask(id: String, title: String?, description: String?, priority: String?, status: String? = null, dueDate: String? = null): Task
     suspend fun deleteTask(id: String)
 }

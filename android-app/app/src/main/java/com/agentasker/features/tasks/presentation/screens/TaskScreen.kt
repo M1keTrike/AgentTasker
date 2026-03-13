@@ -77,9 +77,9 @@ fun TaskScreen(
             },
             onSave = { title, description, priority, reminderAt ->
                 if (uiState.taskToEdit != null) {
-                    viewModel.updateTask(uiState.taskToEdit!!.id, title, description, priority, reminderAt)
+                    viewModel.updateTask(uiState.taskToEdit!!.id, title, description, priority, uiState.formStatus, uiState.formDueDate, reminderAt)
                 } else {
-                    viewModel.createTask(title, description, priority, reminderAt)
+                    viewModel.createTask(title, description, priority, uiState.formStatus, uiState.formDueDate, reminderAt)
                 }
                 viewModel.hideDialog()
             }
