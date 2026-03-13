@@ -1,7 +1,6 @@
 package com.agentasker.features.login.data.datasources.local
 
 import android.content.Context
-import android.util.Log
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.SharedPreferencesMigration
 import androidx.datastore.preferences.core.Preferences
@@ -38,7 +37,6 @@ class SecureDataStoreTokenStorage(private val context: Context) {
 
     private val aead: Aead by lazy { createAead() }
 
-    // In-memory cache for synchronous access from AuthInterceptor
     @Volatile
     private var cachedAccessToken: String? = null
     @Volatile
@@ -83,13 +81,10 @@ class SecureDataStoreTokenStorage(private val context: Context) {
             try {
                 decrypt(it)
             } catch (e: Exception) {
-                Log.w(TAG, "Failed to decrypt value, returning raw (migration data)", e)
                 it
             }
         }
     }
-
-    // ── Token operations ──
 
     suspend fun saveAuthToken(token: AuthToken) {
         val timestamp = System.currentTimeMillis()
@@ -100,7 +95,6 @@ class SecureDataStoreTokenStorage(private val context: Context) {
             prefs[KEY_EXPIRES_IN] = token.expiresIn
             prefs[KEY_TOKEN_TIMESTAMP] = timestamp
         }
-        // Update in-memory cache
         cachedAccessToken = token.accessToken
         cachedExpiresIn = token.expiresIn
         cachedTokenTimestamp = timestamp
@@ -132,7 +126,6 @@ class SecureDataStoreTokenStorage(private val context: Context) {
             val refreshToken = prefs[KEY_REFRESH_TOKEN]?.takeIf { it.isNotEmpty() }?.let { decryptOrNull(it) }
             val expiresIn = prefs[KEY_EXPIRES_IN] ?: 0L
 
-            // Update cache on every emission
             cachedAccessToken = accessToken
             cachedExpiresIn = expiresIn
             cachedTokenTimestamp = prefs[KEY_TOKEN_TIMESTAMP] ?: 0L
@@ -145,8 +138,6 @@ class SecureDataStoreTokenStorage(private val context: Context) {
             )
         }
     }
-
-    // ── User operations ──
 
     suspend fun saveUser(user: User) {
         dataStore.edit { prefs ->
@@ -193,8 +184,6 @@ class SecureDataStoreTokenStorage(private val context: Context) {
         }
     }
 
-    // ── Clear / Validity ──
-
     suspend fun clearAll() {
         dataStore.edit { it.clear() }
         cachedAccessToken = null
@@ -209,10 +198,6 @@ class SecureDataStoreTokenStorage(private val context: Context) {
         return (System.currentTimeMillis() - timestamp) < (expiresIn * 1000)
     }
 
-    /**
-     * Synchronous access for OkHttp interceptor.
-     * Returns the cached access token if still valid, or null.
-     */
     fun getCachedAccessToken(): String? {
         val token = cachedAccessToken ?: return null
         val elapsed = System.currentTimeMillis() - cachedTokenTimestamp
@@ -220,7 +205,6 @@ class SecureDataStoreTokenStorage(private val context: Context) {
     }
 
     companion object {
-        private const val TAG = "SecureDataStoreStorage"
         private const val KEYSET_NAME = "auth_datastore_keyset"
         private const val PREF_FILE_NAME = "auth_datastore_keyset_prefs"
         private const val MASTER_KEY_URI = "android-keystore://auth_datastore_master_key"

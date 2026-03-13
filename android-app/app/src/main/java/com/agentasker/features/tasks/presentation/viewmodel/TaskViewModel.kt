@@ -4,9 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.agentasker.core.hardware.HapticFeedbackManager
 import com.agentasker.core.hardware.ReminderScheduler
-import com.agentasker.features.tasks.data.datasources.local.dao.TaskReminderDao
-import com.agentasker.features.tasks.data.datasources.local.entities.TaskReminderEntity
 import com.agentasker.features.tasks.domain.entities.Task
+import com.agentasker.features.tasks.domain.repositories.TaskReminderRepository
 import com.agentasker.features.tasks.domain.usecases.CreateTaskUseCase
 import com.agentasker.features.tasks.domain.usecases.DeleteTaskUseCase
 import com.agentasker.features.tasks.domain.usecases.GetTasksUseCase
@@ -29,7 +28,7 @@ class TaskViewModel @Inject constructor(
     private val deleteTaskUseCase: DeleteTaskUseCase,
     private val hapticFeedbackManager: HapticFeedbackManager,
     private val reminderScheduler: ReminderScheduler,
-    private val taskReminderDao: TaskReminderDao
+    private val taskReminderRepository: TaskReminderRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(TaskUiState())
@@ -67,7 +66,6 @@ class TaskViewModel @Inject constructor(
             try {
                 getTasksUseCase.refresh()
             } catch (_: Exception) {
-                // Offline: Room Flow already provides cached data
             } finally {
                 _uiState.value = _uiState.value.copy(isLoading = false)
             }
@@ -85,14 +83,7 @@ class TaskViewModel @Inject constructor(
             createTaskUseCase(title, description, priority, status, dueDate).fold(
                 onSuccess = { task ->
                     if (reminderAt != null) {
-                        taskReminderDao.upsertReminder(
-                            TaskReminderEntity(
-                                taskId = task.id,
-                                title = title,
-                                description = description,
-                                reminderAt = reminderAt
-                            )
-                        )
+                        taskReminderRepository.saveReminder(task.id, title, description, reminderAt)
                         reminderScheduler.scheduleReminder(
                             taskId = task.id,
                             title = "Recordatorio: $title",
@@ -118,19 +109,10 @@ class TaskViewModel @Inject constructor(
             updateTaskUseCase(id, title, description, priority, status, dueDate).fold(
                 onSuccess = {
                     hapticFeedbackManager.success()
-                    // Siempre limpiar reminder anterior
-                    taskReminderDao.deleteReminder(id)
+                    taskReminderRepository.deleteReminder(id)
                     reminderScheduler.cancelReminder(id)
-                    // Si hay nuevo reminder, guardarlo y programarlo
                     if (reminderAt != null) {
-                        taskReminderDao.upsertReminder(
-                            TaskReminderEntity(
-                                taskId = id,
-                                title = title ?: "Tarea",
-                                description = description ?: "",
-                                reminderAt = reminderAt
-                            )
-                        )
+                        taskReminderRepository.saveReminder(id, title ?: "Tarea", description ?: "", reminderAt)
                         reminderScheduler.scheduleReminder(
                             taskId = id,
                             title = "Recordatorio: ${title ?: "Tarea"}",
@@ -156,7 +138,7 @@ class TaskViewModel @Inject constructor(
             deleteTaskUseCase(id).fold(
                 onSuccess = {
                     hapticFeedbackManager.warning()
-                    taskReminderDao.deleteReminder(id)
+                    taskReminderRepository.deleteReminder(id)
                     reminderScheduler.cancelReminder(id)
                 },
                 onFailure = { exception ->
@@ -194,14 +176,11 @@ class TaskViewModel @Inject constructor(
             formPriority = task.priority,
             formStatus = task.status,
             formDueDate = task.dueDate,
-            formReminderAt = null // Se cargará async desde task_reminders
+            formReminderAt = null
         )
-        // Cargar reminder desde tabla local
         viewModelScope.launch {
-            val reminder = taskReminderDao.getReminderForTask(task.id)
-            _uiState.value = _uiState.value.copy(
-                formReminderAt = reminder?.reminderAt
-            )
+            val reminderAt = taskReminderRepository.getReminderAt(task.id)
+            _uiState.value = _uiState.value.copy(formReminderAt = reminderAt)
         }
     }
 

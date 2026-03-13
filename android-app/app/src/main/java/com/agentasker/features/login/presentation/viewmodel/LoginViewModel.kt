@@ -34,8 +34,6 @@ class LoginViewModel @Inject constructor(
     val uiState: StateFlow<LoginUiState> = _uiState.asStateFlow()
 
     init {
-        // Verificar si el usuario ya está autenticado al iniciar
-        android.util.Log.d("LoginViewModel", "init - Verificando estado de autenticación")
         checkAuthenticationState()
     }
 
@@ -44,16 +42,12 @@ class LoginViewModel @Inject constructor(
             try {
                 val user = getCurrentUserUseCase()
                 if (user != null) {
-                    android.util.Log.d("LoginViewModel", "Usuario autenticado encontrado: ${user.email}")
                     _uiState.value = _uiState.value.copy(
                         isAuthenticated = true,
                         currentUser = user
                     )
-                } else {
-                    android.util.Log.d("LoginViewModel", "No hay usuario autenticado")
                 }
             } catch (e: Exception) {
-                android.util.Log.e("LoginViewModel", "Error al verificar autenticación", e)
             }
         }
     }
@@ -85,21 +79,16 @@ class LoginViewModel @Inject constructor(
 
         viewModelScope.launch {
             try {
-                android.util.Log.d("LoginViewModel", "Iniciando proceso de Google Sign In")
-
                 signInWithGoogleUseCase(context)
                     .onSuccess { user ->
-                        android.util.Log.d("LoginViewModel", "Google Sign In exitoso: ${user.email}")
                         _uiState.value = _uiState.value.copy(
                             isLoading = false,
                             isAuthenticated = true,
                             currentUser = user,
                             error = null
                         )
-                        android.util.Log.d("LoginViewModel", "Estado actualizado - isAuthenticated: ${_uiState.value.isAuthenticated}")
                     }
                     .onFailure { exception ->
-                        android.util.Log.e("LoginViewModel", "Error en Google Sign In", exception)
                         val errorMessage = when (exception) {
                             is GetCredentialCancellationException -> "Inicio de sesión cancelado"
                             is NoCredentialException -> "No hay cuentas de Google disponibles"
@@ -112,7 +101,6 @@ class LoginViewModel @Inject constructor(
                         )
                     }
             } catch (e: Exception) {
-                android.util.Log.e("LoginViewModel", "Excepción inesperada en signInWithGoogle", e)
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     error = e.message ?: "Error inesperado"

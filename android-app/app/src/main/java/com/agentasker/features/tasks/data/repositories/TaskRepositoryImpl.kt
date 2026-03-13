@@ -35,9 +35,7 @@ class TaskRepositoryImpl @Inject constructor(
         try {
             val remoteTasks = api.getTasks()
             taskDao.upsertTasks(remoteTasks.toEntities(isSynced = true))
-        } catch (_: Exception) {
-            // No network — UI still shows cached data via observeTasks()
-        }
+        } catch (_: Exception) { }
     }
 
     override suspend fun getTasks(): List<Task> {
@@ -114,7 +112,6 @@ class TaskRepositoryImpl @Inject constructor(
         }
         val current = taskDao.getTaskById(id).first()
             ?: throw Exception("Tarea no encontrada")
-        // If task was pending create, keep "create" as pendingAction
         val action = if (current.pendingAction == "create") "create" else "update"
         val updated = current.copy(
             title = title ?: current.title,
@@ -134,7 +131,6 @@ class TaskRepositoryImpl @Inject constructor(
         val existing = taskDao.getTaskByIdSync(id)
 
         if (existing?.pendingAction == "create") {
-            // Task never reached the server, just remove locally
             taskDao.deleteTaskById(id)
             return
         }
@@ -147,7 +143,6 @@ class TaskRepositoryImpl @Inject constructor(
             } catch (_: Exception) { }
         }
 
-        // Offline: mark for deletion, will be synced later
         if (existing != null) {
             taskDao.upsertTask(existing.copy(isSynced = false, pendingAction = "delete"))
             syncScheduler.scheduleSyncOnConnectivity()

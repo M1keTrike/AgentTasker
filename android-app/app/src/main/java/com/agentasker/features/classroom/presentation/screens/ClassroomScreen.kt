@@ -53,9 +53,7 @@ fun ClassroomScreen(
             try {
                 val authResult = classroomAuthService.handleAuthResponse(result.data!!)
                 viewModel.onClassroomConnected(authResult.authorizationCode, authResult.codeVerifier)
-            } catch (e: Exception) {
-                // Error handled by ViewModel
-            }
+            } catch (_: Exception) { }
         }
     }
 

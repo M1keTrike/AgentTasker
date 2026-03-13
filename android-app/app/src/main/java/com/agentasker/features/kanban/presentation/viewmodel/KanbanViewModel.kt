@@ -66,7 +66,6 @@ class KanbanViewModel @Inject constructor(
                 }
         }
 
-        // Load classroom tasks separately (suspend-based, not Flow)
         loadClassroomTasks()
     }
 
@@ -195,9 +194,7 @@ class KanbanViewModel @Inject constructor(
                             status = newStatusKey
                         )
                     }
-                    is KanbanItem.ClassroomItem -> {
-                        // Classroom tasks can't be status-changed from client
-                    }
+                    is KanbanItem.ClassroomItem -> { }
                 }
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(

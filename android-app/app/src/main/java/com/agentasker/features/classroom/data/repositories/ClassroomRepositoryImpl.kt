@@ -58,13 +58,11 @@ class ClassroomRepositoryImpl @Inject constructor(
             val tasks = api.getClassroomTasksByCourse(courseId)
             val domainTasks = tasks.toDomainTasks()
 
-            // Cache tasks locally
             val entities = domainTasks.map { it.toEntity() }
             classroomTaskDao.insertTasks(entities)
 
             Result.success(domainTasks)
         } catch (e: Exception) {
-            // Fallback to cached data
             val cached = classroomTaskDao.getTasksByCourse(courseId)
             if (cached.isNotEmpty()) {
                 Result.success(cached.map { it.toDomain() })
@@ -79,13 +77,11 @@ class ClassroomRepositoryImpl @Inject constructor(
             val tasks = api.getAllClassroomTasks()
             val domainTasks = tasks.toDomainTasks()
 
-            // Cache tasks locally
             val entities = domainTasks.map { it.toEntity() }
             classroomTaskDao.clearAndInsertAll(entities)
 
             Result.success(domainTasks)
         } catch (e: Exception) {
-            // Fallback to cached data
             val cached = classroomTaskDao.getAllTasks()
             if (cached.isNotEmpty()) {
                 Result.success(cached.map { it.toDomain() })

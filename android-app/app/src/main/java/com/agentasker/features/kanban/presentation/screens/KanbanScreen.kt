@@ -171,7 +171,6 @@ private fun KanbanColumnView(
             .clip(RoundedCornerShape(12.dp))
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
     ) {
-        // Column header
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -227,7 +226,6 @@ private fun KanbanColumnView(
             }
         }
 
-        // Task items
         if (items.isEmpty()) {
             Box(
                 modifier = Modifier

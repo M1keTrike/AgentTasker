@@ -118,7 +118,6 @@ fun TaskFormDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                // Reminder section
                 ReminderSelector(
                     reminderAt = reminderAt,
                     onSetReminder = { showDatePicker = true },
@@ -146,7 +145,6 @@ fun TaskFormDialog(
         }
     )
 
-    // DatePicker dialog
     if (showDatePicker) {
         val datePickerState = rememberDatePickerState(
             initialSelectedDateMillis = reminderAt ?: System.currentTimeMillis()
@@ -172,7 +170,6 @@ fun TaskFormDialog(
         }
     }
 
-    // TimePicker dialog
     if (showTimePicker) {
         val calendar = Calendar.getInstance()
         if (reminderAt != null) {

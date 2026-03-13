@@ -3,12 +3,11 @@ package com.agentasker.features.classroom.presentation.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.agentasker.core.hardware.HapticFeedbackManager
-import com.agentasker.features.classroom.domain.entities.ClassroomCourse
-import com.agentasker.features.classroom.domain.entities.ClassroomTask
 import com.agentasker.features.classroom.domain.usecases.ConnectClassroomUseCase
 import com.agentasker.features.classroom.domain.usecases.GetClassroomCoursesUseCase
 import com.agentasker.features.classroom.domain.usecases.GetClassroomTasksUseCase
-import com.agentasker.features.login.data.datasources.local.SecureDataStoreTokenStorage
+import com.agentasker.features.classroom.presentation.screens.ClassroomUiState
+import com.agentasker.features.login.domain.repositories.AuthRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -16,23 +15,12 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-data class ClassroomUiState(
-    val isLoading: Boolean = true,
-    val isConnected: Boolean = false,
-    val isConnecting: Boolean = false,
-    val courses: List<ClassroomCourse> = emptyList(),
-    val tasks: List<ClassroomTask> = emptyList(),
-    val selectedCourseId: String? = null,
-    val error: String? = null,
-    val needsReauth: Boolean = false
-)
-
 @HiltViewModel
 class ClassroomViewModel @Inject constructor(
     private val getCoursesUseCase: GetClassroomCoursesUseCase,
     private val getTasksUseCase: GetClassroomTasksUseCase,
     private val connectClassroomUseCase: ConnectClassroomUseCase,
-    private val secureTokenStorage: SecureDataStoreTokenStorage,
+    private val authRepository: AuthRepository,
     private val hapticFeedbackManager: HapticFeedbackManager
 ) : ViewModel() {
 
@@ -120,7 +108,7 @@ class ClassroomViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isConnecting = true, error = null)
 
-            val idToken = secureTokenStorage.getAuthToken()?.idToken
+            val idToken = authRepository.getAuthToken()?.idToken
             if (idToken == null) {
                 _uiState.value = _uiState.value.copy(
                     isConnecting = false,

@@ -1,6 +1,5 @@
 package com.agentasker.core.network
 
-import android.util.Log
 import com.agentasker.BuildConfig
 import com.agentasker.features.login.data.datasources.local.SecureDataStoreTokenStorage
 import com.agentasker.features.login.data.datasources.remote.model.RefreshTokenRequestDTO
@@ -30,7 +29,6 @@ class TokenAuthenticator(
     }
 
     override fun authenticate(route: Route?, response: Response): Request? {
-        // Avoid infinite retry loops
         if (response.request.header("X-Retry-Auth") != null) {
             return null
         }
@@ -42,7 +40,6 @@ class TokenAuthenticator(
                 val accessToken = currentToken?.accessToken
 
                 if (refreshToken == null || accessToken == null) {
-                    Log.w(TAG, "No refresh token available, clearing session")
                     tokenStorage.clearAll()
                     return@runBlocking null
                 }
@@ -62,21 +59,15 @@ class TokenAuthenticator(
                 )
                 tokenStorage.saveAuthToken(newToken)
 
-                Log.d(TAG, "Token refreshed successfully")
-
                 response.request.newBuilder()
                     .header("Authorization", "Bearer ${refreshResponse.accessToken}")
                     .header("X-Retry-Auth", "true")
                     .build()
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to refresh token, clearing session", e)
                 tokenStorage.clearAll()
                 null
             }
         }
     }
 
-    companion object {
-        private const val TAG = "TokenAuthenticator"
-    }
 }
