@@ -1,12 +1,16 @@
 package com.agentasker.core.di
 
+import android.content.Context
 import com.agentasker.BuildConfig
 import com.agentasker.core.network.AgentTaskerApi
 import com.agentasker.core.network.AuthInterceptor
+import com.agentasker.core.network.ConnectivityManagerNetworkMonitor
+import com.agentasker.core.network.NetworkMonitor
 import com.agentasker.features.login.data.datasources.local.SecureDataStoreTokenStorage
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
@@ -49,5 +53,11 @@ object NetworkModule {
     @Singleton
     fun provideAgentTaskerApi(retrofit: Retrofit): AgentTaskerApi {
         return retrofit.create(AgentTaskerApi::class.java)
+    }
+
+    @Provides
+    @Singleton
+    fun provideNetworkMonitor(@ApplicationContext context: Context): NetworkMonitor {
+        return ConnectivityManagerNetworkMonitor(context)
     }
 }
