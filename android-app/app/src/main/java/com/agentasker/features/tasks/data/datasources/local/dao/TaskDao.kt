@@ -10,11 +10,14 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface TaskDao {
 
-    @Query("SELECT * FROM tasks ORDER BY updatedAt DESC")
+    @Query("SELECT * FROM tasks WHERE pendingAction IS NULL OR pendingAction != 'delete' ORDER BY updatedAt DESC")
     fun getAllTasks(): Flow<List<TaskEntity>>
 
     @Query("SELECT * FROM tasks WHERE id = :id")
     fun getTaskById(id: String): Flow<TaskEntity?>
+
+    @Query("SELECT * FROM tasks WHERE id = :id LIMIT 1")
+    suspend fun getTaskByIdSync(id: String): TaskEntity?
 
     @Query("SELECT * FROM tasks WHERE priority = :priority")
     fun getTasksByPriority(priority: String): Flow<List<TaskEntity>>
@@ -24,6 +27,9 @@ interface TaskDao {
 
     @Query("SELECT * FROM tasks WHERE isSynced = 0")
     suspend fun getUnsyncedTasks(): List<TaskEntity>
+
+    @Query("SELECT * FROM tasks WHERE pendingAction IS NOT NULL")
+    suspend fun getPendingTasks(): List<TaskEntity>
 
     @Upsert
     suspend fun upsertTasks(tasks: List<TaskEntity>)
