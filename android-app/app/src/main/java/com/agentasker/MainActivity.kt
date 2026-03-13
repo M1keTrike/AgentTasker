@@ -11,6 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.School
 import androidx.compose.material.icons.outlined.TaskAlt
+import androidx.compose.material.icons.outlined.ViewColumn
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -36,6 +37,7 @@ import com.agentasker.features.classroom.presentation.screens.ClassroomScreen
 import com.agentasker.features.dashboard.presentation.screens.DashboardScreen
 import com.agentasker.features.login.presentation.screens.LoginScreen
 import com.agentasker.features.login.presentation.viewmodel.LoginViewModel
+import com.agentasker.features.kanban.presentation.screens.KanbanScreen
 import com.agentasker.features.tasks.presentation.screens.TaskScreen
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
@@ -128,6 +130,12 @@ fun AgentTaskerApp(
                 ClassroomScreen(classroomAuthService = classroomAuthService)
             }
         }
+
+        composable(Screen.Kanban.route) {
+            MainScaffold(navController = navController, currentRoute = Screen.Kanban.route, isOffline = !isOnline) {
+                KanbanScreen()
+            }
+        }
     }
 }
 
@@ -167,6 +175,20 @@ fun MainScaffold(
                     },
                     icon = { Icon(Icons.Outlined.TaskAlt, contentDescription = "Tareas") },
                     label = { Text("Tareas") }
+                )
+                NavigationBarItem(
+                    selected = currentRoute == Screen.Kanban.route,
+                    onClick = {
+                        if (currentRoute != Screen.Kanban.route) {
+                            navController.navigate(Screen.Kanban.route) {
+                                popUpTo(Screen.Dashboard.route) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        }
+                    },
+                    icon = { Icon(Icons.Outlined.ViewColumn, contentDescription = "Kanban") },
+                    label = { Text("Kanban") }
                 )
                 NavigationBarItem(
                     selected = currentRoute == Screen.Classroom.route,

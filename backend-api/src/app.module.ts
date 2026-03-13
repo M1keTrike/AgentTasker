@@ -7,6 +7,7 @@ import { TasksModule } from './tasks/tasks.module';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { ClassroomModule } from './classroom/classroom.module';
+import { KanbanModule } from './kanban/kanban.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { ClassroomModule } from './classroom/classroom.module';
     UsersModule,
     AuthModule,
     ClassroomModule,
+    KanbanModule,
   ],
   controllers: [AppController],
   providers: [AppService],
