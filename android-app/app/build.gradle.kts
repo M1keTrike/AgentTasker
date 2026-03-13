@@ -111,6 +111,10 @@ dependencies {
     implementation(libs.androidx.browser)
     implementation(libs.androidx.security.crypto)
 
+    // DataStore
+    implementation(libs.androidx.datastore.preferences)
+    implementation(libs.tink.android)
+
     // Room
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)

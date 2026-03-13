@@ -1,7 +1,7 @@
 package com.agentasker.features.login.data.repositories
 
 import com.agentasker.core.network.AgentTaskerApi
-import com.agentasker.features.login.data.datasources.local.SecureTokenStorage
+import com.agentasker.features.login.data.datasources.local.SecureDataStoreTokenStorage
 import com.agentasker.features.login.data.datasources.remote.mapper.toDomain
 import com.agentasker.features.login.data.datasources.remote.mapper.toDomainFromLogin
 import com.agentasker.features.login.data.datasources.remote.model.GoogleSignInRequestDTO
@@ -14,7 +14,7 @@ import javax.inject.Inject
 
 class AuthRepositoryImpl @Inject constructor(
     private val api: AgentTaskerApi,
-    private val secureStorage: SecureTokenStorage
+    private val secureStorage: SecureDataStoreTokenStorage
 ) : AuthRepository {
 
     override suspend fun signInWithGoogle(idToken: String): Result<User> {
@@ -101,4 +101,3 @@ class AuthRepositoryImpl @Inject constructor(
         return user != null && tokenValid
     }
 }
-

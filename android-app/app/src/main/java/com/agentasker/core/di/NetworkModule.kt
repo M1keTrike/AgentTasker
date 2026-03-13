@@ -3,7 +3,7 @@ package com.agentasker.core.di
 import com.agentasker.BuildConfig
 import com.agentasker.core.network.AgentTaskerApi
 import com.agentasker.core.network.AuthInterceptor
-import com.agentasker.features.login.data.datasources.local.SecureTokenStorage
+import com.agentasker.features.login.data.datasources.local.SecureDataStoreTokenStorage
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -20,8 +20,8 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideAuthInterceptor(secureTokenStorage: SecureTokenStorage): AuthInterceptor {
-        return AuthInterceptor(secureTokenStorage)
+    fun provideAuthInterceptor(secureDataStoreTokenStorage: SecureDataStoreTokenStorage): AuthInterceptor {
+        return AuthInterceptor(secureDataStoreTokenStorage)
     }
 
     @Provides

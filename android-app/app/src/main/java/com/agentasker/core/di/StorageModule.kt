@@ -1,7 +1,7 @@
 package com.agentasker.core.di
 
 import android.content.Context
-import com.agentasker.features.login.data.datasources.local.SecureTokenStorage
+import com.agentasker.features.login.data.datasources.local.SecureDataStoreTokenStorage
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -15,7 +15,7 @@ object StorageModule {
 
     @Provides
     @Singleton
-    fun provideSecureTokenStorage(@ApplicationContext context: Context): SecureTokenStorage {
-        return SecureTokenStorage(context)
+    fun provideSecureDataStoreTokenStorage(@ApplicationContext context: Context): SecureDataStoreTokenStorage {
+        return SecureDataStoreTokenStorage(context)
     }
 }
