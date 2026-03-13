@@ -11,8 +11,7 @@ fun TaskEntity.toDomain(): Task {
         description = description,
         priority = priority,
         createdAt = createdAt,
-        updatedAt = updatedAt,
-        reminderAt = reminderAt
+        updatedAt = updatedAt
     )
 }
 
@@ -24,8 +23,7 @@ fun Task.toEntity(isSynced: Boolean = true): TaskEntity {
         priority = priority,
         createdAt = createdAt,
         updatedAt = updatedAt,
-        isSynced = isSynced,
-        reminderAt = reminderAt
+        isSynced = isSynced
     )
 }
 

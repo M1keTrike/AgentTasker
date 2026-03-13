@@ -6,7 +6,6 @@ data class Task(
     val description: String,
     val priority: String,
     val createdAt: String? = null,
-    val updatedAt: String? = null,
-    val reminderAt: Long? = null
+    val updatedAt: String? = null
 )
 

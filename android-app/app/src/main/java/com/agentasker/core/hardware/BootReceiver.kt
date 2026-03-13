@@ -3,7 +3,7 @@ package com.agentasker.core.hardware
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import com.agentasker.features.tasks.data.datasources.local.dao.TaskDao
+import com.agentasker.features.tasks.data.datasources.local.dao.TaskReminderDao
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -14,7 +14,7 @@ import javax.inject.Inject
 class BootReceiver : BroadcastReceiver() {
 
     @Inject
-    lateinit var taskDao: TaskDao
+    lateinit var taskReminderDao: TaskReminderDao
 
     @Inject
     lateinit var reminderScheduler: ReminderScheduler
@@ -25,16 +25,14 @@ class BootReceiver : BroadcastReceiver() {
         val pendingResult = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val tasksWithReminders = taskDao.getTasksWithReminders()
-                tasksWithReminders.forEach { task ->
-                    task.reminderAt?.let { reminderAt ->
-                        reminderScheduler.scheduleReminder(
-                            taskId = task.id,
-                            title = "Recordatorio: ${task.title}",
-                            body = task.description,
-                            triggerAtMillis = reminderAt
-                        )
-                    }
+                val activeReminders = taskReminderDao.getActiveReminders()
+                activeReminders.forEach { reminder ->
+                    reminderScheduler.scheduleReminder(
+                        taskId = reminder.taskId,
+                        title = "Recordatorio: ${reminder.title}",
+                        body = reminder.description,
+                        triggerAtMillis = reminder.reminderAt
+                    )
                 }
             } finally {
                 pendingResult.finish()
