@@ -43,6 +43,7 @@ export class AuthService {
     user: { id: number; email: string; displayName: string | null; username: string | null; photoUrl: string | null; emailVerified: boolean },
     accessToken: string,
     idToken: string,
+    refreshToken: string,
   ) {
     return {
       user: {
@@ -55,7 +56,7 @@ export class AuthService {
       token: {
         accessToken,
         idToken,
-        refreshToken: null,
+        refreshToken,
         expiresIn: 86400,
       },
     };
@@ -74,8 +75,9 @@ export class AuthService {
 
     const jwtPayload = { sub: user.id, username: user.username ?? user.email };
     const accessToken = await this.jwtService.signAsync(jwtPayload);
+    const refreshToken = await this.usersService.generateRefreshToken(user.id);
 
-    return this.buildAuthResponse(user, accessToken, idToken);
+    return this.buildAuthResponse(user, accessToken, idToken, refreshToken);
   }
 
   async googleClassroomLogin(idToken: string, authorizationCode: string, redirectUri: string, codeVerifier?: string) {
@@ -89,13 +91,47 @@ export class AuthService {
       emailVerified: googlePayload.email_verified ?? false,
     });
 
-    // Exchange the authorization code for Google tokens and store them
     const tokens = await this.googleTokenService.exchangeCode(authorizationCode, redirectUri, codeVerifier);
     await this.googleTokenService.saveTokens(user.id, tokens);
 
     const jwtPayload = { sub: user.id, username: user.username ?? user.email };
     const accessToken = await this.jwtService.signAsync(jwtPayload);
+    const refreshToken = await this.usersService.generateRefreshToken(user.id);
 
-    return this.buildAuthResponse(user, accessToken, idToken);
+    return this.buildAuthResponse(user, accessToken, idToken, refreshToken);
+  }
+
+  async refreshAccessToken(expiredAccessToken: string, oldRefreshToken: string) {
+    let userId: number;
+
+    try {
+      const decoded = this.jwtService.decode(expiredAccessToken) as { sub: number; username: string } | null;
+      if (!decoded || !decoded.sub) {
+        throw new UnauthorizedException('Invalid access token');
+      }
+      userId = decoded.sub;
+    } catch {
+      throw new UnauthorizedException('Invalid access token');
+    }
+
+    const isValid = await this.usersService.validateRefreshToken(userId, oldRefreshToken);
+    if (!isValid) {
+      throw new UnauthorizedException('Invalid or expired refresh token');
+    }
+
+    const user = await this.usersService.findById(userId);
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    const jwtPayload = { sub: user.id, username: user.username ?? user.email };
+    const accessToken = await this.jwtService.signAsync(jwtPayload);
+    const newRefreshToken = await this.usersService.generateRefreshToken(user.id);
+
+    return {
+      accessToken,
+      refreshToken: newRefreshToken,
+      expiresIn: 86400,
+    };
   }
 }

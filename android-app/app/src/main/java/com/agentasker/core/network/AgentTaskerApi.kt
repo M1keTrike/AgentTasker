@@ -9,6 +9,8 @@ import com.agentasker.features.login.data.datasources.remote.model.GoogleSignInR
 import com.agentasker.features.login.data.datasources.remote.model.LoginRequestDTO
 import com.agentasker.features.login.data.datasources.remote.model.LoginResponseDTO
 import com.agentasker.features.login.data.datasources.remote.model.ProfileResponseDTO
+import com.agentasker.features.login.data.datasources.remote.model.RefreshTokenRequestDTO
+import com.agentasker.features.login.data.datasources.remote.model.RefreshTokenResponseDTO
 import com.agentasker.features.login.data.datasources.remote.model.RegisterRequestDTO
 import com.agentasker.features.login.data.datasources.remote.model.RegisterResponseDTO
 import com.agentasker.features.tasks.data.datasources.remote.model.CreateTaskRequest
@@ -54,6 +56,9 @@ interface AgentTaskerApi {
 
     @GET("users/profile")
     suspend fun getProfile(): ProfileResponseDTO
+
+    @POST("auth/refresh")
+    suspend fun refreshToken(@Body request: RefreshTokenRequestDTO): RefreshTokenResponseDTO
 
     // Classroom endpoints
     @POST("auth/google-classroom")
