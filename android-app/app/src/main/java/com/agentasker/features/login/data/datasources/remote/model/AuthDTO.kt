@@ -62,6 +62,10 @@ data class RegisterResponseDTO(
 data class LoginResponseDTO(
     @SerializedName("accessToken")
     val accessToken: String,
+    @SerializedName("refreshToken")
+    val refreshToken: String?,
+    @SerializedName("expiresIn")
+    val expiresIn: Long?,
     @SerializedName("user")
     val user: UserLoginDTO
 )
@@ -73,6 +77,22 @@ data class UserLoginDTO(
     val username: String,
     @SerializedName("email")
     val email: String
+)
+
+data class RefreshTokenRequestDTO(
+    @SerializedName("accessToken")
+    val accessToken: String,
+    @SerializedName("refreshToken")
+    val refreshToken: String
+)
+
+data class RefreshTokenResponseDTO(
+    @SerializedName("accessToken")
+    val accessToken: String,
+    @SerializedName("refreshToken")
+    val refreshToken: String,
+    @SerializedName("expiresIn")
+    val expiresIn: Long
 )
 
 data class ProfileResponseDTO(

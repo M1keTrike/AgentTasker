@@ -7,6 +7,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
+import { randomUUID } from 'crypto';
 import { User } from './entities/user.entity';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -22,7 +23,6 @@ export class UsersService {
   async register(registerDto: RegisterDto): Promise<{ message: string }> {
     const { username, email, password } = registerDto;
 
-    // Verificar si el usuario ya existe
     const existingUser = await this.userRepository.findOne({
       where: [{ username }, { email }],
     });
@@ -31,10 +31,8 @@ export class UsersService {
       throw new ConflictException('Username or email already exists');
     }
 
-    // Hashear la contraseña
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Crear el usuario
     const user = this.userRepository.create({
       username,
       email,
@@ -48,10 +46,14 @@ export class UsersService {
 
   async login(
     loginDto: LoginDto,
-  ): Promise<{ accessToken: string; user: Partial<User> }> {
+  ): Promise<{
+    accessToken: string;
+    refreshToken: string;
+    expiresIn: number;
+    user: Partial<User>;
+  }> {
     const { username, password } = loginDto;
 
-    // Buscar usuario
     const user = await this.userRepository.findOne({
       where: { username },
     });
@@ -60,25 +62,49 @@ export class UsersService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    // Verificar contraseña
     const isPasswordValid = await bcrypt.compare(password, user.password);
 
     if (!isPasswordValid) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    // Generar JWT
     const payload = { sub: user.id, username: user.username };
     const accessToken = await this.jwtService.signAsync(payload);
+    const refreshToken = await this.generateRefreshToken(user.id);
 
     return {
       accessToken,
+      refreshToken,
+      expiresIn: 86400,
       user: {
         id: user.id,
         username: user.username,
         email: user.email,
       },
     };
+  }
+
+  async generateRefreshToken(userId: number): Promise<string> {
+    const rawToken = randomUUID();
+    const hashedToken = await bcrypt.hash(rawToken, 10);
+
+    await this.userRepository.update(userId, { refreshToken: hashedToken });
+
+    return rawToken;
+  }
+
+  async validateRefreshToken(
+    userId: number,
+    rawToken: string,
+  ): Promise<boolean> {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user || !user.refreshToken) return false;
+
+    return bcrypt.compare(rawToken, user.refreshToken);
+  }
+
+  async invalidateRefreshToken(userId: number): Promise<void> {
+    await this.userRepository.update(userId, { refreshToken: null });
   }
 
   async findById(id: number): Promise<User | null> {
@@ -96,7 +122,6 @@ export class UsersService {
     photoUrl: string | null;
     emailVerified: boolean;
   }): Promise<User> {
-    // 1. Try to find by googleId (returning user)
     let user = await this.userRepository.findOne({
       where: { googleId: googleData.googleId },
     });
@@ -108,7 +133,6 @@ export class UsersService {
       return this.userRepository.save(user);
     }
 
-    // 2. Try to find by email (existing internal account — migrate it)
     user = await this.userRepository.findOne({
       where: { email: googleData.email },
     });
@@ -121,7 +145,6 @@ export class UsersService {
       return this.userRepository.save(user);
     }
 
-    // 3. Create brand-new Google user
     const newUser = this.userRepository.create({
       email: googleData.email,
       googleId: googleData.googleId,

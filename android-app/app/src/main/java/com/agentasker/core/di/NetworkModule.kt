@@ -5,6 +5,7 @@ import com.agentasker.BuildConfig
 import com.agentasker.core.network.AgentTaskerApi
 import com.agentasker.core.network.AuthInterceptor
 import com.agentasker.core.network.ConnectivityManagerNetworkMonitor
+import com.agentasker.core.network.TokenAuthenticator
 import com.agentasker.core.network.NetworkMonitor
 import com.agentasker.features.login.data.datasources.local.SecureDataStoreTokenStorage
 import dagger.Module
@@ -30,12 +31,19 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideOkHttpClient(authInterceptor: AuthInterceptor): OkHttpClient {
+    fun provideTokenAuthenticator(secureDataStoreTokenStorage: SecureDataStoreTokenStorage): TokenAuthenticator {
+        return TokenAuthenticator(secureDataStoreTokenStorage)
+    }
+
+    @Provides
+    @Singleton
+    fun provideOkHttpClient(authInterceptor: AuthInterceptor, tokenAuthenticator: TokenAuthenticator): OkHttpClient {
         return OkHttpClient.Builder()
             .connectTimeout(60, TimeUnit.SECONDS)
             .readTimeout(60, TimeUnit.SECONDS)
             .writeTimeout(60, TimeUnit.SECONDS)
             .addInterceptor(authInterceptor)
+            .authenticator(tokenAuthenticator)
             .build()
     }
 

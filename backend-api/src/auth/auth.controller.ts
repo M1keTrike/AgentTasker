@@ -3,6 +3,7 @@ import type { Response } from 'express';
 import { AuthService } from './auth.service';
 import { GoogleLoginDto } from './dto/google-login.dto';
 import { GoogleClassroomLoginDto } from './dto/google-classroom-login.dto';
+import { RefreshTokenDto } from './dto/refresh-token.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -23,6 +24,12 @@ export class AuthController {
       dto.redirectUri,
       dto.codeVerifier,
     );
+  }
+
+  @Post('refresh')
+  @HttpCode(HttpStatus.OK)
+  refreshToken(@Body() dto: RefreshTokenDto) {
+    return this.authService.refreshAccessToken(dto.accessToken, dto.refreshToken);
   }
 
   @Get('classroom/callback')

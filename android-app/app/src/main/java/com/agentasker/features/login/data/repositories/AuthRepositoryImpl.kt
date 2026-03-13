@@ -52,8 +52,8 @@ class AuthRepositoryImpl @Inject constructor(
             val token = AuthToken(
                 accessToken = response.accessToken,
                 idToken = null,
-                refreshToken = null,
-                expiresIn = 86400L
+                refreshToken = response.refreshToken,
+                expiresIn = response.expiresIn ?: 86400L
             )
 
             secureStorage.saveAuthToken(token)

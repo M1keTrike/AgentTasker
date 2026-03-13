@@ -36,6 +36,9 @@ export class User {
   @Column({ default: false })
   emailVerified: boolean;
 
+  @Column({ type: 'varchar', nullable: true })
+  refreshToken: string | null;
+
   @OneToOne(() => ClassroomData, (cd) => cd.user)
   classroomData: ClassroomData;
 
