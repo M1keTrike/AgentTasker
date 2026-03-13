@@ -7,6 +7,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.School
 import androidx.compose.material.icons.outlined.TaskAlt
 import androidx.compose.material3.Icon
@@ -30,6 +31,7 @@ import com.agentasker.core.navigation.Screen
 import com.agentasker.core.ui.theme.AgenTaskerTheme
 import com.agentasker.features.classroom.data.services.ClassroomAuthService
 import com.agentasker.features.classroom.presentation.screens.ClassroomScreen
+import com.agentasker.features.dashboard.presentation.screens.DashboardScreen
 import com.agentasker.features.login.presentation.screens.LoginScreen
 import com.agentasker.features.login.presentation.viewmodel.LoginViewModel
 import com.agentasker.features.tasks.presentation.screens.TaskScreen
@@ -63,7 +65,7 @@ fun AgentTaskerApp(classroomAuthService: ClassroomAuthService) {
     val loginUiState by loginViewModel.uiState.collectAsStateWithLifecycle()
 
     val startDestination = if (loginUiState.isAuthenticated) {
-        Screen.Tasks.route
+        Screen.Dashboard.route
     } else {
         Screen.Login.route
     }
@@ -76,9 +78,30 @@ fun AgentTaskerApp(classroomAuthService: ClassroomAuthService) {
             LoginScreen(
                 viewModel = loginViewModel,
                 onLoginSuccess = {
-                    navigatorWrapper.navigateToTasks(clearBackStack = true)
+                    navigatorWrapper.navigateToDashboard(clearBackStack = true)
                 }
             )
+        }
+
+        composable(Screen.Dashboard.route) {
+            MainScaffold(navController = navController, currentRoute = Screen.Dashboard.route) {
+                DashboardScreen(
+                    onNavigateToTasks = {
+                        navController.navigate(Screen.Tasks.route) {
+                            popUpTo(Screen.Dashboard.route) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
+                    onNavigateToClassroom = {
+                        navController.navigate(Screen.Classroom.route) {
+                            popUpTo(Screen.Dashboard.route) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
+                )
+            }
         }
 
         composable(Screen.Tasks.route) {
@@ -105,12 +128,26 @@ fun MainScaffold(
         bottomBar = {
             NavigationBar {
                 NavigationBarItem(
+                    selected = currentRoute == Screen.Dashboard.route,
+                    onClick = {
+                        if (currentRoute != Screen.Dashboard.route) {
+                            navController.navigate(Screen.Dashboard.route) {
+                                popUpTo(Screen.Dashboard.route) { inclusive = true }
+                                launchSingleTop = true
+                            }
+                        }
+                    },
+                    icon = { Icon(Icons.Outlined.Dashboard, contentDescription = "Dashboard") },
+                    label = { Text("Dashboard") }
+                )
+                NavigationBarItem(
                     selected = currentRoute == Screen.Tasks.route,
                     onClick = {
                         if (currentRoute != Screen.Tasks.route) {
                             navController.navigate(Screen.Tasks.route) {
-                                popUpTo(Screen.Tasks.route) { inclusive = true }
+                                popUpTo(Screen.Dashboard.route) { saveState = true }
                                 launchSingleTop = true
+                                restoreState = true
                             }
                         }
                     },
@@ -122,7 +159,7 @@ fun MainScaffold(
                     onClick = {
                         if (currentRoute != Screen.Classroom.route) {
                             navController.navigate(Screen.Classroom.route) {
-                                popUpTo(Screen.Tasks.route) { saveState = true }
+                                popUpTo(Screen.Dashboard.route) { saveState = true }
                                 launchSingleTop = true
                                 restoreState = true
                             }
