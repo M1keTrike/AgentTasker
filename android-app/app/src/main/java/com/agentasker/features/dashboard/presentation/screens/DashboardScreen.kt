@@ -1,5 +1,6 @@
 package com.agentasker.features.dashboard.presentation.screens
 
+import android.annotation.SuppressLint
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,10 +14,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Assignment
+import androidx.compose.material.icons.automirrored.outlined.Assignment
 import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Flag
@@ -252,6 +252,7 @@ private fun SummaryCounter(
     }
 }
 
+@SuppressLint("NewApi")
 @Composable
 private fun UpcomingItemRow(item: UpcomingItem) {
     val dateFormatter = DateTimeFormatter.ofPattern("dd MMM, HH:mm")
@@ -261,7 +262,7 @@ private fun UpcomingItemRow(item: UpcomingItem) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
-            imageVector = if (item.isClassroom) Icons.Outlined.School else Icons.Outlined.Assignment,
+            imageVector = if (item.isClassroom) Icons.Outlined.School else Icons.AutoMirrored.Outlined.Assignment,
             contentDescription = null,
             modifier = Modifier.size(18.dp),
             tint = MaterialTheme.colorScheme.onSurfaceVariant
