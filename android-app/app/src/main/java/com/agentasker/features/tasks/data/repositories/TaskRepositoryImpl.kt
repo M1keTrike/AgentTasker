@@ -9,6 +9,7 @@ import com.agentasker.features.tasks.data.datasources.local.mapper.toEntities
 import com.agentasker.features.tasks.data.datasources.local.mapper.toEntity
 import com.agentasker.features.tasks.data.datasources.remote.model.CreateTaskRequest
 import com.agentasker.features.tasks.data.datasources.remote.model.UpdateTaskRequest
+import com.agentasker.features.tasks.data.workers.TaskSyncScheduler
 import com.agentasker.features.tasks.domain.entities.Task
 import com.agentasker.features.tasks.domain.repositories.TaskRepository
 import kotlinx.coroutines.flow.Flow
@@ -19,7 +20,8 @@ import javax.inject.Inject
 class TaskRepositoryImpl @Inject constructor(
     private val api: AgentTaskerApi,
     private val taskDao: TaskDao,
-    private val networkMonitor: NetworkMonitor
+    private val networkMonitor: NetworkMonitor,
+    private val syncScheduler: TaskSyncScheduler
 ) : TaskRepository {
 
     private suspend fun isOnline(): Boolean = networkMonitor.isOnline.first()
@@ -79,9 +81,11 @@ class TaskRepositoryImpl @Inject constructor(
             priority = priority,
             status = status,
             dueDate = dueDate,
-            isSynced = false
+            isSynced = false,
+            pendingAction = "create"
         )
         taskDao.upsertTask(localEntity)
+        syncScheduler.scheduleSyncOnConnectivity()
         return localEntity.toDomain()
     }
 
@@ -110,25 +114,45 @@ class TaskRepositoryImpl @Inject constructor(
         }
         val current = taskDao.getTaskById(id).first()
             ?: throw Exception("Tarea no encontrada")
+        // If task was pending create, keep "create" as pendingAction
+        val action = if (current.pendingAction == "create") "create" else "update"
         val updated = current.copy(
             title = title ?: current.title,
             description = description ?: current.description,
             priority = priority ?: current.priority,
             status = status ?: current.status,
             dueDate = dueDate ?: current.dueDate,
-            isSynced = false
+            isSynced = false,
+            pendingAction = action
         )
         taskDao.upsertTask(updated)
+        syncScheduler.scheduleSyncOnConnectivity()
         return updated.toDomain()
     }
 
     override suspend fun deleteTask(id: String) {
-        taskDao.deleteTaskById(id)
-        if (!isOnline()) return
-        try {
-            api.deleteTask(id.toInt())
-        } catch (_: Exception) {
-            // Task already removed from local cache for instant UI feedback
+        val existing = taskDao.getTaskByIdSync(id)
+
+        if (existing?.pendingAction == "create") {
+            // Task never reached the server, just remove locally
+            taskDao.deleteTaskById(id)
+            return
+        }
+
+        if (isOnline()) {
+            try {
+                api.deleteTask(id.toInt())
+                taskDao.deleteTaskById(id)
+                return
+            } catch (_: Exception) { }
+        }
+
+        // Offline: mark for deletion, will be synced later
+        if (existing != null) {
+            taskDao.upsertTask(existing.copy(isSynced = false, pendingAction = "delete"))
+            syncScheduler.scheduleSyncOnConnectivity()
+        } else {
+            taskDao.deleteTaskById(id)
         }
     }
 }

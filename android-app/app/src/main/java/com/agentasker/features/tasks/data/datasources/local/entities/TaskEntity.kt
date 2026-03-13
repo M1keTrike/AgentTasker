@@ -14,5 +14,6 @@ data class TaskEntity(
     val dueDate: String? = null,
     val createdAt: String? = null,
     val updatedAt: String? = null,
-    val isSynced: Boolean = true
+    val isSynced: Boolean = true,
+    val pendingAction: String? = null // "create", "update", "delete", or null (synced)
 )
