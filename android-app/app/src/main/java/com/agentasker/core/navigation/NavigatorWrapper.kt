@@ -49,6 +49,16 @@ class NavigatorWrapper(private val navController: NavHostController) {
         }
     }
 
+    fun navigateToKanban(clearBackStack: Boolean = false) {
+        if (clearBackStack) {
+            navController.navigate(Screen.Kanban.route) {
+                popUpTo(0) { inclusive = true }
+            }
+        } else {
+            navController.navigate(Screen.Kanban.route)
+        }
+    }
+
     fun navigateBack() {
         navController.popBackStack()
     }

@@ -5,5 +5,6 @@ sealed class Screen(val route: String) {
     object Dashboard : Screen("dashboard")
     object Tasks : Screen("tasks")
     object Classroom : Screen("classroom")
+    object Kanban : Screen("kanban")
 }
 

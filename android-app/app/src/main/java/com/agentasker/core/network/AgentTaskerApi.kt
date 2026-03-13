@@ -13,6 +13,10 @@ import com.agentasker.features.login.data.datasources.remote.model.RefreshTokenR
 import com.agentasker.features.login.data.datasources.remote.model.RefreshTokenResponseDTO
 import com.agentasker.features.login.data.datasources.remote.model.RegisterRequestDTO
 import com.agentasker.features.login.data.datasources.remote.model.RegisterResponseDTO
+import com.agentasker.features.kanban.data.datasources.remote.model.CreateKanbanColumnRequest
+import com.agentasker.features.kanban.data.datasources.remote.model.KanbanColumnDTO
+import com.agentasker.features.kanban.data.datasources.remote.model.ReorderKanbanColumnsRequest
+import com.agentasker.features.kanban.data.datasources.remote.model.UpdateKanbanColumnRequest
 import com.agentasker.features.tasks.data.datasources.remote.model.CreateTaskRequest
 import com.agentasker.features.tasks.data.datasources.remote.model.TaskDTO
 import com.agentasker.features.tasks.data.datasources.remote.model.TaskResponse
@@ -75,6 +79,22 @@ interface AgentTaskerApi {
 
     @GET("classroom/status")
     suspend fun getClassroomStatus(): ClassroomStatusDTO
+
+    // Kanban endpoints
+    @GET("kanban/columns")
+    suspend fun getKanbanColumns(): List<KanbanColumnDTO>
+
+    @POST("kanban/columns")
+    suspend fun createKanbanColumn(@Body request: CreateKanbanColumnRequest): KanbanColumnDTO
+
+    @PATCH("kanban/columns/{id}")
+    suspend fun updateKanbanColumn(@Path("id") id: Int, @Body request: UpdateKanbanColumnRequest): KanbanColumnDTO
+
+    @DELETE("kanban/columns/{id}")
+    suspend fun deleteKanbanColumn(@Path("id") id: Int): Response<Unit>
+
+    @PATCH("kanban/columns/reorder")
+    suspend fun reorderKanbanColumns(@Body request: ReorderKanbanColumnsRequest): List<KanbanColumnDTO>
 
 }
 
