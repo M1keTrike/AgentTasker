@@ -23,7 +23,6 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -42,7 +41,6 @@ import com.agentasker.core.navigation.KanbanRoute
 import com.agentasker.core.navigation.LoginRoute
 import com.agentasker.core.navigation.TasksRoute
 import com.agentasker.core.network.NetworkMonitor
-import com.agentasker.core.notifications.FcmTokenRepository
 import com.agentasker.core.ui.components.OfflineBanner
 import com.agentasker.core.ui.theme.AgenTaskerTheme
 import com.agentasker.features.login.presentation.viewmodel.LoginViewModel
@@ -58,9 +56,6 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var networkMonitor: NetworkMonitor
 
-    @Inject
-    lateinit var fcmTokenRepository: FcmTokenRepository
-
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { /* granted: no-op; si se niega, el usuario simplemente no verá pushes */ }
@@ -75,8 +70,7 @@ class MainActivity : ComponentActivity() {
             AgenTaskerTheme {
                 AgentTaskerApp(
                     featureNavGraphs = featureNavGraphs,
-                    networkMonitor = networkMonitor,
-                    fcmTokenRepository = fcmTokenRepository
+                    networkMonitor = networkMonitor
                 )
             }
         }
@@ -102,21 +96,12 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun AgentTaskerApp(
     featureNavGraphs: Set<FeatureNavGraph>,
-    networkMonitor: NetworkMonitor,
-    fcmTokenRepository: FcmTokenRepository
+    networkMonitor: NetworkMonitor
 ) {
     val navController = rememberNavController()
 
     val loginViewModel: LoginViewModel = hiltViewModel()
     val loginUiState by loginViewModel.uiState.collectAsStateWithLifecycle()
-
-    // Al autenticarse, empujar el token FCM al backend (cubre el caso en que
-    // FCM entregó el token antes de que el usuario hiciera login).
-    LaunchedEffect(loginUiState.isAuthenticated) {
-        if (loginUiState.isAuthenticated) {
-            fcmTokenRepository.syncWithBackend()
-        }
-    }
 
     val isOnline by networkMonitor.isOnline.collectAsStateWithLifecycle(initialValue = true)
 

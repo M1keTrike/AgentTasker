@@ -4,12 +4,17 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.util.Log
 import com.agentasker.core.network.AgentTaskerApi
+import com.agentasker.features.login.data.datasources.local.SecureDataStoreTokenStorage
 import dagger.Lazy
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -23,6 +28,9 @@ import javax.inject.Singleton
  *     el token actual.
  *  3. Enviar el token al backend mediante [AgentTaskerApi.updateFcmToken]
  *     cuando el usuario esté autenticado (el AuthInterceptor añade el Bearer).
+ *  4. Observar [SecureDataStoreTokenStorage.observeAuthToken] y reintentar
+ *     el envío automáticamente en cuanto aparezca un accessToken válido.
+ *     Esto cubre el caso en que el token FCM se obtiene antes del login.
  *
  * Nota: [AgentTaskerApi] se inyecta como [Lazy] porque este repositorio lo
  * usa también [AgentTaskerMessagingService], que puede construirse antes
@@ -31,12 +39,36 @@ import javax.inject.Singleton
 @Singleton
 class FcmTokenRepository @Inject constructor(
     @ApplicationContext context: Context,
-    private val apiLazy: Lazy<AgentTaskerApi>
+    private val apiLazy: Lazy<AgentTaskerApi>,
+    private val tokenStorage: SecureDataStoreTokenStorage
 ) {
     private val prefs: SharedPreferences =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+
+    // Serializa todas las llamadas a syncWithBackend para evitar POSTs paralelos
+    // cuando fetchInitialFcmToken y onNewToken se disparan simultáneamente.
+    private val syncMutex = Mutex()
+
+    init {
+        // Reintenta el sync en cuanto el usuario se autentica o refresca su token.
+        // `.catch {}` evita que una excepción transitoria del DataStore
+        // (decriptación, I/O) mate el observer de forma silenciosa.
+        scope.launch {
+            tokenStorage.observeAuthToken()
+                .distinctUntilChangedBy { it?.accessToken }
+                .catch { e ->
+                    Log.w(TAG, "observeAuthToken falló, observer se resetea: ${e.message}")
+                }
+                .collect { authToken ->
+                    if (authToken?.accessToken != null && !isSynced()) {
+                        Log.d(TAG, "Auth detectada, reintentando sync del token FCM")
+                        syncWithBackend()
+                    }
+                }
+        }
+    }
 
     /** Persiste el token y dispara el envío al backend en segundo plano. */
     fun saveToken(token: String) {
@@ -61,29 +93,35 @@ class FcmTokenRepository @Inject constructor(
     /**
      * Envía el token al backend si existe y aún no está sincronizado.
      * Se puede llamar manualmente tras un login exitoso para forzar el envío.
+     *
+     * Protegido por [syncMutex] para evitar llamadas concurrentes cuando
+     * múltiples triggers (fetchInitialFcmToken, onNewToken, observer) se
+     * disparan al mismo tiempo.
      */
     fun syncWithBackend() {
-        val token = getToken() ?: return
-        if (isSynced()) return
-
         scope.launch {
-            try {
-                val response = apiLazy.get().updateFcmToken(
-                    UpdateFcmTokenRequest(fcmToken = token)
-                )
-                if (response.isSuccessful) {
-                    prefs.edit().putBoolean(KEY_SYNCED, true).apply()
-                    Log.d(TAG, "FCM token sincronizado con el backend")
-                } else {
-                    Log.w(
-                        TAG,
-                        "Fallo al sincronizar token FCM: HTTP ${response.code()}"
+            syncMutex.withLock {
+                val token = getToken() ?: return@withLock
+                if (isSynced()) return@withLock
+
+                try {
+                    val response = apiLazy.get().updateFcmToken(
+                        UpdateFcmTokenRequest(fcmToken = token)
                     )
+                    if (response.isSuccessful) {
+                        prefs.edit().putBoolean(KEY_SYNCED, true).apply()
+                        Log.d(TAG, "FCM token sincronizado con el backend")
+                    } else {
+                        Log.w(
+                            TAG,
+                            "Fallo al sincronizar token FCM: HTTP ${response.code()}"
+                        )
+                    }
+                } catch (e: Exception) {
+                    // 401: el usuario no está autenticado todavía; es normal,
+                    // se reintentará automáticamente desde el observer de authToken.
+                    Log.w(TAG, "No se pudo enviar el token FCM al backend: ${e.message}")
                 }
-            } catch (e: Exception) {
-                // 401: el usuario no está autenticado todavía; es normal,
-                // se reintentará tras el próximo login.
-                Log.w(TAG, "No se pudo enviar el token FCM al backend: ${e.message}")
             }
         }
     }

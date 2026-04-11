@@ -23,4 +23,8 @@
     <string name="task_reminder_none">Sin recordatorio</string>
     <string name="notification_channel_tasks">Recordatorios de tareas</string>
     <string name="notification_channel_classroom">Tareas de Classroom</string>
+
+    <!-- Canal por defecto usado por FCM cuando la app recibe un push en background.
+         Debe coincidir con NotificationHelper.PUSH_CHANNEL. -->
+    <string name="default_notification_channel_id" translatable="false">push_notifications</string>
 </resources>

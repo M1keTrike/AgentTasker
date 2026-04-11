@@ -83,6 +83,18 @@
             </intent-filter>
         </service>
 
+        <!-- Metadatos usados por FCM cuando la app recibe un push en background.
+             Ver: https://firebase.google.com/docs/cloud-messaging/android/client -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_notification" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/notification_color" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="@string/default_notification_channel_id" />
+
         <!-- Started + Bound Service para sincronización de tareas -->
         <service
             android:name=".features.tasks.presentation.service.TaskSyncService"
