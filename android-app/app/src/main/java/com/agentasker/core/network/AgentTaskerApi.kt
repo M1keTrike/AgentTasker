@@ -61,6 +61,11 @@ interface AgentTaskerApi {
     @GET("users/profile")
     suspend fun getProfile(): ProfileResponseDTO
 
+    @POST("users/fcm-token")
+    suspend fun updateFcmToken(
+        @Body request: com.agentasker.core.notifications.UpdateFcmTokenRequest
+    ): Response<Unit>
+
     @POST("auth/refresh")
     suspend fun refreshToken(@Body request: RefreshTokenRequestDTO): RefreshTokenResponseDTO
 

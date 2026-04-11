@@ -1,9 +1,14 @@
 package com.agentasker
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
@@ -18,6 +23,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -36,6 +42,7 @@ import com.agentasker.core.navigation.KanbanRoute
 import com.agentasker.core.navigation.LoginRoute
 import com.agentasker.core.navigation.TasksRoute
 import com.agentasker.core.network.NetworkMonitor
+import com.agentasker.core.notifications.FcmTokenRepository
 import com.agentasker.core.ui.components.OfflineBanner
 import com.agentasker.core.ui.theme.AgenTaskerTheme
 import com.agentasker.features.login.presentation.viewmodel.LoginViewModel
@@ -51,17 +58,43 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var networkMonitor: NetworkMonitor
 
+    @Inject
+    lateinit var fcmTokenRepository: FcmTokenRepository
+
+    private val notificationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { /* granted: no-op; si se niega, el usuario simplemente no verá pushes */ }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        ensureNotificationPermission()
 
         setContent {
             AgenTaskerTheme {
                 AgentTaskerApp(
                     featureNavGraphs = featureNavGraphs,
-                    networkMonitor = networkMonitor
+                    networkMonitor = networkMonitor,
+                    fcmTokenRepository = fcmTokenRepository
                 )
             }
+        }
+    }
+
+    /**
+     * Pide el permiso `POST_NOTIFICATIONS` en tiempo de ejecución (Android 13+).
+     * En versiones anteriores el permiso se concede automáticamente en el Manifest.
+     */
+    private fun ensureNotificationPermission() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+
+        val granted = ContextCompat.checkSelfPermission(
+            this, Manifest.permission.POST_NOTIFICATIONS
+        ) == PackageManager.PERMISSION_GRANTED
+
+        if (!granted) {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }
 }
@@ -69,12 +102,21 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun AgentTaskerApp(
     featureNavGraphs: Set<FeatureNavGraph>,
-    networkMonitor: NetworkMonitor
+    networkMonitor: NetworkMonitor,
+    fcmTokenRepository: FcmTokenRepository
 ) {
     val navController = rememberNavController()
 
     val loginViewModel: LoginViewModel = hiltViewModel()
     val loginUiState by loginViewModel.uiState.collectAsStateWithLifecycle()
+
+    // Al autenticarse, empujar el token FCM al backend (cubre el caso en que
+    // FCM entregó el token antes de que el usuario hiciera login).
+    LaunchedEffect(loginUiState.isAuthenticated) {
+        if (loginUiState.isAuthenticated) {
+            fcmTokenRepository.syncWithBackend()
+        }
+    }
 
     val isOnline by networkMonitor.isOnline.collectAsStateWithLifecycle(initialValue = true)
 
