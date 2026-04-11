@@ -1,5 +1,6 @@
 package com.agentasker.features.kanban.presentation.viewmodel
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.agentasker.features.classroom.domain.repositories.ClassroomRepository
@@ -12,7 +13,9 @@ import com.agentasker.features.kanban.domain.usecases.UpdateKanbanColumnUseCase
 import com.agentasker.features.kanban.domain.repositories.KanbanRepository
 import com.agentasker.features.kanban.presentation.screens.KanbanUiState
 import com.agentasker.features.tasks.domain.repositories.TaskRepository
+import com.agentasker.features.tasks.presentation.service.TaskSyncServiceConnection
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -29,15 +32,34 @@ class KanbanViewModel @Inject constructor(
     private val deleteColumnUseCase: DeleteKanbanColumnUseCase,
     private val kanbanRepository: KanbanRepository,
     private val taskRepository: TaskRepository,
-    private val classroomRepository: ClassroomRepository
+    private val classroomRepository: ClassroomRepository,
+    @ApplicationContext private val appContext: Context
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(KanbanUiState())
     val uiState: StateFlow<KanbanUiState> = _uiState.asStateFlow()
 
+    // Conexión al Bound Service de sincronización
+    private val syncConnection = TaskSyncServiceConnection(appContext)
+
     init {
         observeKanbanData()
         refreshData()
+        bindSyncService()
+    }
+
+    private fun bindSyncService() {
+        syncConnection.bind()
+        viewModelScope.launch {
+            syncConnection.syncState.collect { state ->
+                _uiState.value = _uiState.value.copy(syncState = state)
+            }
+        }
+    }
+
+    override fun onCleared() {
+        syncConnection.unbind()
+        super.onCleared()
     }
 
     private fun observeKanbanData() {
@@ -206,5 +228,14 @@ class KanbanViewModel @Inject constructor(
 
     fun clearError() {
         _uiState.value = _uiState.value.copy(error = null)
+    }
+
+    /**
+     * Dispara la sincronización vía el Bound Service.
+     * Si la conexión ya está establecida, llama directamente al método del
+     * servicio a través del Binder. Si no, cae al patrón Started Service.
+     */
+    fun startTaskSyncService() {
+        syncConnection.triggerSync()
     }
 }

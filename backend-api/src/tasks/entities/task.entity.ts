@@ -49,6 +49,9 @@ export class Task {
   @Column({ type: 'timestamp', nullable: true })
   dueDate: Date | null;
 
+  @Column({ type: 'boolean', default: false })
+  reminderSent: boolean;
+
   @Column({ nullable: true })
   userId: number;
 

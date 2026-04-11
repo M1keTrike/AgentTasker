@@ -39,6 +39,9 @@ export class User {
   @Column({ type: 'varchar', nullable: true })
   refreshToken: string | null;
 
+  @Column({ type: 'varchar', nullable: true })
+  fcmToken: string | null;
+
   @OneToOne(() => ClassroomData, (cd) => cd.user)
   classroomData: ClassroomData;
 

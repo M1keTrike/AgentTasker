@@ -2,6 +2,7 @@ package com.agentasker.features.kanban.presentation.screens
 
 import com.agentasker.features.kanban.domain.entities.KanbanColumn
 import com.agentasker.features.kanban.domain.entities.KanbanItem
+import com.agentasker.features.tasks.presentation.service.TaskSyncService
 
 data class KanbanUiState(
     val isLoading: Boolean = false,
@@ -12,5 +13,6 @@ data class KanbanUiState(
     val columnToEdit: KanbanColumn? = null,
     val formTitle: String = "",
     val formStatusKey: String = "",
-    val formColor: String? = null
+    val formColor: String? = null,
+    val syncState: TaskSyncService.SyncState = TaskSyncService.SyncState.Idle
 )

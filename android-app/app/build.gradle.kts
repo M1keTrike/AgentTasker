@@ -95,14 +95,16 @@ dependencies {
     implementation(libs.retrofit)
     implementation(libs.retrofit.converter.gson)
     implementation(libs.okhttp)
+    implementation(libs.okhttp.logging.interceptor)
     implementation(libs.gson)
 
     // Security & Encryption
     implementation(libs.androidx.security.crypto)
 
-    // Firebase Authentication
+    // Firebase Authentication + Messaging (FCM)
     implementation(platform(libs.firebase.bom))
     implementation(libs.google.firebase.auth)
+    implementation(libs.firebase.messaging)
 
     // Credential Manager para Google Sign-In
     implementation(libs.androidx.credentials)

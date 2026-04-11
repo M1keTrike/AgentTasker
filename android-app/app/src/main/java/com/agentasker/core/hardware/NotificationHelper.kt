@@ -39,7 +39,43 @@ class NotificationHelper @Inject constructor(
                 description = "Notificaciones de tareas de Google Classroom"
             }
             notificationManager.createNotificationChannel(classroomChannel)
+
+            val pushChannel = NotificationChannel(
+                PUSH_CHANNEL,
+                "Notificaciones push",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Mensajes push enviados desde el servidor (FCM)"
+            }
+            notificationManager.createNotificationChannel(pushChannel)
         }
+    }
+
+    fun showPushNotification(title: String, body: String, data: Map<String, String> = emptyMap()) {
+        // FLAG_ACTIVITY_SINGLE_TOP en vez de CLEAR_TASK para que, si la Activity
+        // ya está en el top del stack, Android invoque onNewIntent() con los
+        // extras en lugar de recrearla desde cero — así el deep link se procesa
+        // sin perder el estado de navegación actual.
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            data.forEach { (k, v) -> putExtra(k, v) }
+        }
+        val notificationId = System.currentTimeMillis().toInt()
+        val pendingIntent = PendingIntent.getActivity(
+            context, notificationId, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val notification = NotificationCompat.Builder(context, PUSH_CHANNEL)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(title)
+            .setContentText(body)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setContentIntent(pendingIntent)
+            .setAutoCancel(true)
+            .build()
+
+        notificationManager.notify(notificationId, notification)
     }
 
     fun showTaskReminder(taskId: String, title: String, body: String) {
@@ -87,5 +123,6 @@ class NotificationHelper @Inject constructor(
     companion object {
         const val TASK_REMINDERS_CHANNEL = "task_reminders"
         const val CLASSROOM_CHANNEL = "classroom_tasks"
+        const val PUSH_CHANNEL = "push_notifications"
     }
 }

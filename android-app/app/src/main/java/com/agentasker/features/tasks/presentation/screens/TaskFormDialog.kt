@@ -50,6 +50,7 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import java.util.TimeZone
 
 @SuppressLint("NewApi")
 @OptIn(ExperimentalMaterial3Api::class)
@@ -208,8 +209,20 @@ fun TaskFormDialog(
                         Spacer(modifier = Modifier.width(8.dp))
                         Button(onClick = {
                             selectedDateMillis?.let { dateMillis ->
+                                // `datePickerState.selectedDateMillis` devuelve medianoche
+                                // UTC del día seleccionado. Si construimos un Calendar local
+                                // directamente con ese instante, caemos en el día anterior
+                                // cuando la zona horaria del dispositivo es negativa (ej. GMT-6).
+                                // Solución: extraer Y/M/D usando un Calendar en UTC y
+                                // combinarlos con la hora local del TimePicker.
+                                val utcCal = Calendar.getInstance(
+                                    TimeZone.getTimeZone("UTC")
+                                ).apply { timeInMillis = dateMillis }
+
                                 val cal = Calendar.getInstance().apply {
-                                    timeInMillis = dateMillis
+                                    set(Calendar.YEAR, utcCal.get(Calendar.YEAR))
+                                    set(Calendar.MONTH, utcCal.get(Calendar.MONTH))
+                                    set(Calendar.DAY_OF_MONTH, utcCal.get(Calendar.DAY_OF_MONTH))
                                     set(Calendar.HOUR_OF_DAY, timePickerState.hour)
                                     set(Calendar.MINUTE, timePickerState.minute)
                                     set(Calendar.SECOND, 0)

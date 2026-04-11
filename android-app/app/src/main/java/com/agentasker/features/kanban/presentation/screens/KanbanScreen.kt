@@ -21,15 +21,20 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.outlined.ViewColumn
 import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -46,6 +51,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import com.agentasker.features.tasks.presentation.service.TaskSyncService
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -91,7 +97,41 @@ fun KanbanScreen(
         modifier = Modifier.fillMaxSize(),
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("Tablero Kanban", fontWeight = FontWeight.ExtraBold) }
+                title = { Text("Tablero Kanban", fontWeight = FontWeight.ExtraBold) },
+                actions = {
+                    IconButton(
+                        onClick = { viewModel.startTaskSyncService() },
+                        enabled = uiState.syncState !is TaskSyncService.SyncState.Running
+                    ) {
+                        when (uiState.syncState) {
+                            is TaskSyncService.SyncState.Running -> {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.padding(6.dp),
+                                    strokeWidth = 2.dp
+                                )
+                            }
+                            is TaskSyncService.SyncState.Error -> {
+                                Icon(
+                                    imageVector = Icons.Default.CloudOff,
+                                    contentDescription = "Error de sincronización",
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                            }
+                            is TaskSyncService.SyncState.Success -> {
+                                Icon(
+                                    imageVector = Icons.Default.CloudDone,
+                                    contentDescription = "Sincronización completada"
+                                )
+                            }
+                            TaskSyncService.SyncState.Idle -> {
+                                Icon(
+                                    imageVector = Icons.Default.CloudSync,
+                                    contentDescription = "Sincronizar tareas"
+                                )
+                            }
+                        }
+                    }
+                }
             )
         },
         floatingActionButton = {
