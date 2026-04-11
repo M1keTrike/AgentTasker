@@ -1,5 +1,6 @@
 package com.agentasker.features.tasks.data.repositories
 
+import android.util.Log
 import com.agentasker.core.network.AgentTaskerApi
 import com.agentasker.core.network.NetworkMonitor
 import com.agentasker.features.tasks.data.datasources.local.dao.TaskDao
@@ -15,7 +16,10 @@ import com.agentasker.features.tasks.domain.repositories.TaskRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import retrofit2.HttpException
 import javax.inject.Inject
+
+private const val TAG = "TaskRepository"
 
 class TaskRepositoryImpl @Inject constructor(
     private val api: AgentTaskerApi,
@@ -64,13 +68,20 @@ class TaskRepositoryImpl @Inject constructor(
             status = status,
             dueDate = dueDate
         )
+        Log.d(TAG, "createTask online=${isOnline()} request=$request")
         if (isOnline()) {
             try {
                 val response = api.createTask(request)
                 val entity = response.toEntity(isSynced = true)
                 taskDao.upsertTask(entity)
+                Log.d(TAG, "createTask OK remote id=${response.id}")
                 return entity.toDomain()
-            } catch (_: Exception) { }
+            } catch (e: HttpException) {
+                val body = try { e.response()?.errorBody()?.string() } catch (_: Exception) { null }
+                Log.w(TAG, "createTask HTTP ${e.code()}: $body — fallback a local")
+            } catch (e: Exception) {
+                Log.w(TAG, "createTask exception: ${e.message} — fallback a local", e)
+            }
         }
         val localEntity = TaskEntity(
             id = "local_${System.currentTimeMillis()}",

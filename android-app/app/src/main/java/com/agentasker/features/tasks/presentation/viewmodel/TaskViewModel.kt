@@ -18,7 +18,25 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
+import java.time.Instant
 import javax.inject.Inject
+
+/**
+ * Convierte un timestamp (millis desde epoch) a un string ISO 8601 en UTC,
+ * formato aceptado por `@IsDateString()` del backend NestJS.
+ *
+ * Ejemplo: `1744409383353` → `"2026-04-11T20:09:43.353Z"`.
+ */
+private fun Long.toIsoString(): String = Instant.ofEpochMilli(this).toString()
+
+/**
+ * Parsea un string ISO 8601 a millis. Retorna null si el string es inválido.
+ */
+private fun String.toEpochMillisOrNull(): Long? = try {
+    Instant.parse(this).toEpochMilli()
+} catch (_: Exception) {
+    null
+}
 
 @HiltViewModel
 class TaskViewModel @Inject constructor(
@@ -80,7 +98,13 @@ class TaskViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
 
-            createTaskUseCase(title, description, priority, status, dueDate).fold(
+            // Si el usuario puso un recordatorio desde el picker, eso se envía
+            // como `dueDate` al backend para que el cron del server dispare el
+            // push. El `reminderAt` sigue programando el AlarmManager local
+            // como respaldo offline.
+            val effectiveDueDate = dueDate ?: reminderAt?.toIsoString()
+
+            createTaskUseCase(title, description, priority, status, effectiveDueDate).fold(
                 onSuccess = { task ->
                     if (reminderAt != null) {
                         taskReminderRepository.saveReminder(task.id, title, description, reminderAt)
@@ -106,7 +130,12 @@ class TaskViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
 
-            updateTaskUseCase(id, title, description, priority, status, dueDate).fold(
+            // Misma unificación que en createTask. Si el usuario cambió el
+            // reminder en el picker, el nuevo valor va como dueDate al backend
+            // para que el cron lo vuelva a disparar con la fecha actualizada.
+            val effectiveDueDate = dueDate ?: reminderAt?.toIsoString()
+
+            updateTaskUseCase(id, title, description, priority, status, effectiveDueDate).fold(
                 onSuccess = {
                     hapticFeedbackManager.success()
                     taskReminderRepository.deleteReminder(id)
@@ -168,6 +197,11 @@ class TaskViewModel @Inject constructor(
     }
 
     fun showEditDialog(task: Task) {
+        // Si la task ya viene del backend con un dueDate, lo usamos como
+        // reminderAt inicial para que el picker muestre la fecha correcta.
+        // Si no, intentamos leer el reminder local guardado en Room.
+        val initialReminderFromDueDate = task.dueDate?.toEpochMillisOrNull()
+
         _uiState.value = _uiState.value.copy(
             showDialog = true,
             taskToEdit = task,
@@ -176,11 +210,13 @@ class TaskViewModel @Inject constructor(
             formPriority = task.priority,
             formStatus = task.status,
             formDueDate = task.dueDate,
-            formReminderAt = null
+            formReminderAt = initialReminderFromDueDate
         )
         viewModelScope.launch {
-            val reminderAt = taskReminderRepository.getReminderAt(task.id)
-            _uiState.value = _uiState.value.copy(formReminderAt = reminderAt)
+            val localReminder = taskReminderRepository.getReminderAt(task.id)
+            if (localReminder != null) {
+                _uiState.value = _uiState.value.copy(formReminderAt = localReminder)
+            }
         }
     }
 

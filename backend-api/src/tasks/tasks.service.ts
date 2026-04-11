@@ -5,6 +5,21 @@ import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { Task } from './entities/task.entity';
 
+/**
+ * Convierte un Date, un string ISO o null/undefined a millis (epoch).
+ * Robusto contra el hecho de que TypeORM devuelve `Date` al leer, pero
+ * `class-validator` mantiene strings cuando el DTO entra con `@IsDateString`.
+ */
+function toMillis(value: Date | string | null | undefined): number | null {
+  if (value == null) return null;
+  if (value instanceof Date) return value.getTime();
+  if (typeof value === 'string') {
+    const parsed = new Date(value).getTime();
+    return Number.isNaN(parsed) ? null : parsed;
+  }
+  return null;
+}
+
 @Injectable()
 export class TasksService {
   constructor(
@@ -43,14 +58,26 @@ export class TasksService {
     userId: number,
   ): Promise<Task> {
     const task = await this.findOne(id, userId);
-    const previousDueDate = task.dueDate?.getTime() ?? null;
+
+    // `task.dueDate` viene de la DB como Date; el DTO la trae como string ISO.
+    // Normalizamos a millis con un helper para poder compararlos sin crashes.
+    const previousDueDateMillis = toMillis(task.dueDate);
+
     Object.assign(task, updateTaskDto);
 
-    // Si el usuario cambió el dueDate, reseteamos reminderSent para que
-    // el cron lo vuelva a disparar con la nueva fecha.
-    const newDueDate = task.dueDate?.getTime() ?? null;
-    if (previousDueDate !== newDueDate) {
+    // Tras el assign, task.dueDate puede ser string (del DTO) o Date (si no
+    // se envió). Re-normalizamos para comparar y, si cambió, convertimos el
+    // string a Date real para que TypeORM lo persista como timestamp.
+    const newDueDateMillis = toMillis(task.dueDate);
+
+    if (previousDueDateMillis !== newDueDateMillis) {
       task.reminderSent = false;
+    }
+
+    // Asegurar tipo Date antes de save() — TypeORM puede aceptar el string,
+    // pero así evitamos sorpresas en futuras reads.
+    if (typeof task.dueDate === 'string') {
+      task.dueDate = new Date(task.dueDate);
     }
 
     return await this.taskRepository.save(task);
