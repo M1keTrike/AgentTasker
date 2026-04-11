@@ -9,6 +9,7 @@
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
+
     <application
         android:name=".AgentTaskerApplication"
         android:allowBackup="true"
@@ -72,6 +73,21 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
+
+        <!-- Firebase Cloud Messaging Service -->
+        <service
+            android:name=".core.notifications.AgentTaskerMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
+        <!-- Started + Bound Service para sincronización de tareas -->
+        <service
+            android:name=".features.tasks.presentation.service.TaskSyncService"
+            android:enabled="true"
+            android:exported="false" />
     </application>
 
 </manifest>

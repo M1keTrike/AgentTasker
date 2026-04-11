@@ -100,9 +100,10 @@ dependencies {
     // Security & Encryption
     implementation(libs.androidx.security.crypto)
 
-    // Firebase Authentication
+    // Firebase Authentication + Messaging (FCM)
     implementation(platform(libs.firebase.bom))
     implementation(libs.google.firebase.auth)
+    implementation(libs.firebase.messaging)
 
     // Credential Manager para Google Sign-In
     implementation(libs.androidx.credentials)
