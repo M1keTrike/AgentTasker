@@ -1,6 +1,7 @@
 package com.agentasker
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -8,7 +9,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.content.ContextCompat
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
@@ -23,10 +23,13 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
+import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination.Companion.hasRoute
@@ -41,10 +44,14 @@ import com.agentasker.core.navigation.KanbanRoute
 import com.agentasker.core.navigation.LoginRoute
 import com.agentasker.core.navigation.TasksRoute
 import com.agentasker.core.network.NetworkMonitor
+import com.agentasker.core.notifications.DeepLink
 import com.agentasker.core.ui.components.OfflineBanner
 import com.agentasker.core.ui.theme.AgenTaskerTheme
 import com.agentasker.features.login.presentation.viewmodel.LoginViewModel
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -60,20 +67,41 @@ class MainActivity : ComponentActivity() {
         ActivityResultContracts.RequestPermission()
     ) { /* granted: no-op; si se niega, el usuario simplemente no verá pushes */ }
 
+    /**
+     * Deep link pendiente de procesar. Se llena cuando la Activity arranca
+     * desde una notificación o cuando recibe `onNewIntent` con un payload
+     * que contiene `screen=...`. El Composable lo observa y navega.
+     */
+    private val pendingDeepLink: MutableStateFlow<DeepLink?> = MutableStateFlow(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
         ensureNotificationPermission()
+        pendingDeepLink.value = DeepLink.fromIntent(intent)
 
         setContent {
             AgenTaskerTheme {
                 AgentTaskerApp(
                     featureNavGraphs = featureNavGraphs,
-                    networkMonitor = networkMonitor
+                    networkMonitor = networkMonitor,
+                    pendingDeepLink = pendingDeepLink.asStateFlow(),
+                    onDeepLinkConsumed = { pendingDeepLink.value = null }
                 )
             }
         }
+    }
+
+    /**
+     * Se invoca cuando la Activity ya estaba creada (launchMode=singleTop)
+     * y Android reentrega un intent — por ejemplo cuando el usuario toca
+     * una notificación estando la app en foreground o background.
+     */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        DeepLink.fromIntent(intent)?.let { pendingDeepLink.value = it }
     }
 
     /**
@@ -96,7 +124,9 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun AgentTaskerApp(
     featureNavGraphs: Set<FeatureNavGraph>,
-    networkMonitor: NetworkMonitor
+    networkMonitor: NetworkMonitor,
+    pendingDeepLink: StateFlow<DeepLink?>,
+    onDeepLinkConsumed: () -> Unit
 ) {
     val navController = rememberNavController()
 
@@ -104,6 +134,29 @@ fun AgentTaskerApp(
     val loginUiState by loginViewModel.uiState.collectAsStateWithLifecycle()
 
     val isOnline by networkMonitor.isOnline.collectAsStateWithLifecycle(initialValue = true)
+
+    val deepLink by pendingDeepLink.collectAsState()
+
+    // Navegación reactiva a un deep link. Solo dispara cuando el usuario ya
+    // está autenticado (si no, lo dejamos pendiente hasta que haga login).
+    LaunchedEffect(deepLink, loginUiState.isAuthenticated) {
+        val target = deepLink ?: return@LaunchedEffect
+        if (!loginUiState.isAuthenticated) return@LaunchedEffect
+
+        val route: Any = when (target) {
+            DeepLink.Dashboard -> DashboardRoute
+            DeepLink.Tasks -> TasksRoute
+            DeepLink.Kanban -> KanbanRoute
+            DeepLink.Classroom -> ClassroomRoute
+        }
+
+        navController.navigate(route) {
+            popUpTo(DashboardRoute) { saveState = true }
+            launchSingleTop = true
+            restoreState = true
+        }
+        onDeepLinkConsumed()
+    }
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination

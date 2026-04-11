@@ -52,8 +52,12 @@ class NotificationHelper @Inject constructor(
     }
 
     fun showPushNotification(title: String, body: String, data: Map<String, String> = emptyMap()) {
+        // FLAG_ACTIVITY_SINGLE_TOP en vez de CLEAR_TASK para que, si la Activity
+        // ya está en el top del stack, Android invoque onNewIntent() con los
+        // extras en lugar de recrearla desde cero — así el deep link se procesa
+        // sin perder el estado de navegación actual.
         val intent = Intent(context, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
             data.forEach { (k, v) -> putExtra(k, v) }
         }
         val notificationId = System.currentTimeMillis().toInt()

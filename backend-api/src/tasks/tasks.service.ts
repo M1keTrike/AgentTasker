@@ -13,7 +13,13 @@ export class TasksService {
   ) {}
 
   async create(createTaskDto: CreateTaskDto, userId: number): Promise<Task> {
-    const task = this.taskRepository.create({ ...createTaskDto, userId });
+    // Una tarea recién creada siempre arranca con reminderSent=false para
+    // que el cron pueda dispararla cuando llegue su dueDate.
+    const task = this.taskRepository.create({
+      ...createTaskDto,
+      userId,
+      reminderSent: false,
+    });
     return await this.taskRepository.save(task);
   }
 
@@ -37,7 +43,16 @@ export class TasksService {
     userId: number,
   ): Promise<Task> {
     const task = await this.findOne(id, userId);
+    const previousDueDate = task.dueDate?.getTime() ?? null;
     Object.assign(task, updateTaskDto);
+
+    // Si el usuario cambió el dueDate, reseteamos reminderSent para que
+    // el cron lo vuelva a disparar con la nueva fecha.
+    const newDueDate = task.dueDate?.getTime() ?? null;
+    if (previousDueDate !== newDueDate) {
+      task.reminderSent = false;
+    }
+
     return await this.taskRepository.save(task);
   }
 
