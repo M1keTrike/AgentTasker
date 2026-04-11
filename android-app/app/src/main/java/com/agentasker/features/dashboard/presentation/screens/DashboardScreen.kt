@@ -1,6 +1,9 @@
 package com.agentasker.features.dashboard.presentation.screens
 
 import android.annotation.SuppressLint
+import android.app.Activity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,19 +22,28 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Assignment
 import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.CloudSync
 import androidx.compose.material.icons.outlined.Flag
+import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.Pending
 import androidx.compose.material.icons.outlined.School
 import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material3.Button
 import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -42,6 +54,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.agentasker.core.ui.components.LoadingState
 import com.agentasker.features.dashboard.presentation.components.DashboardCard
+import com.agentasker.features.dashboard.presentation.viewmodel.ClassroomIntegrationUiState
+import com.agentasker.features.dashboard.presentation.viewmodel.ClassroomIntegrationViewModel
 import com.agentasker.features.dashboard.presentation.viewmodel.DashboardUiState
 import com.agentasker.features.dashboard.presentation.viewmodel.DashboardViewModel
 import com.agentasker.features.dashboard.presentation.viewmodel.UpcomingItem
@@ -51,17 +65,49 @@ import java.time.format.DateTimeFormatter
 @Composable
 fun DashboardScreen(
     viewModel: DashboardViewModel = hiltViewModel(),
+    classroomViewModel: ClassroomIntegrationViewModel = hiltViewModel(),
     onNavigateToTasks: () -> Unit = {},
     onNavigateToClassroom: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val classroomState by classroomViewModel.uiState.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // OAuth launcher: abre la pantalla de consentimiento de Google y
+    // devuelve aquí el Intent con el authorization code. Con ese Intent
+    // el ViewModel hace el handshake con el backend y deja Classroom
+    // conectado.
+    val authLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK && result.data != null) {
+            classroomViewModel.onAuthResult(result.data!!)
+        }
+    }
+
+    LaunchedEffect(classroomState.error) {
+        classroomState.error?.let {
+            snackbarHostState.showSnackbar(it)
+            classroomViewModel.clearMessages()
+        }
+    }
+    LaunchedEffect(classroomState.infoMessage) {
+        classroomState.infoMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            // Al sincronizar, recargar el dashboard para reflejar las nuevas
+            // tasks importadas en los contadores.
+            viewModel.refresh()
+            classroomViewModel.clearMessages()
+        }
+    }
 
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
                 title = { Text("Dashboard") }
             )
-        }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { innerPadding ->
         when (val state = uiState) {
             is DashboardUiState.Loading -> {
@@ -83,8 +129,13 @@ fun DashboardScreen(
             is DashboardUiState.Success -> {
                 DashboardContent(
                     state = state,
+                    classroomState = classroomState,
                     onNavigateToTasks = onNavigateToTasks,
                     onNavigateToClassroom = onNavigateToClassroom,
+                    onConnectClassroom = {
+                        authLauncher.launch(classroomViewModel.createAuthIntent())
+                    },
+                    onSyncClassroom = { classroomViewModel.syncNow() },
                     modifier = Modifier.padding(innerPadding)
                 )
             }
@@ -95,8 +146,11 @@ fun DashboardScreen(
 @Composable
 private fun DashboardContent(
     state: DashboardUiState.Success,
+    classroomState: ClassroomIntegrationUiState,
     onNavigateToTasks: () -> Unit,
     onNavigateToClassroom: () -> Unit,
+    onConnectClassroom: () -> Unit,
+    onSyncClassroom: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
@@ -154,6 +208,14 @@ private fun DashboardContent(
         }
 
         item {
+            ClassroomIntegrationCard(
+                state = classroomState,
+                onConnect = onConnectClassroom,
+                onSync = onSyncClassroom
+            )
+        }
+
+        item {
             DashboardCard(
                 title = "Estado de Classroom",
                 icon = Icons.Outlined.School,
@@ -177,6 +239,104 @@ private fun DashboardContent(
         }
 
         item { Spacer(modifier = Modifier.height(8.dp)) }
+    }
+}
+
+@Composable
+private fun ClassroomIntegrationCard(
+    state: ClassroomIntegrationUiState,
+    onConnect: () -> Unit,
+    onSync: () -> Unit
+) {
+    DashboardCard(
+        title = "Integraciones",
+        icon = Icons.Outlined.Link,
+        iconTint = Color(0xFF1976D2)
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.School,
+                    contentDescription = null,
+                    tint = Color(0xFF388E3C),
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Google Classroom",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        text = if (state.isConnected) "Conectado" else "No conectado",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (state.isConnected) Color(0xFF388E3C)
+                        else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            if (!state.isConnected) {
+                Button(
+                    onClick = onConnect,
+                    enabled = !state.isConnecting,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    if (state.isConnecting) {
+                        CircularProgressIndicator(
+                            strokeWidth = 2.dp,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                    } else {
+                        Icon(
+                            imageVector = Icons.Outlined.Link,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                    }
+                    Text("Conectar con Classroom")
+                }
+            } else {
+                OutlinedButton(
+                    onClick = onSync,
+                    enabled = !state.isSyncing,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    if (state.isSyncing) {
+                        CircularProgressIndicator(
+                            strokeWidth = 2.dp,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                    } else {
+                        Icon(
+                            imageVector = Icons.Outlined.CloudSync,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                    }
+                    Text(
+                        if (state.isSyncing) "Sincronizando…"
+                        else "Sincronizar tareas pendientes"
+                    )
+                }
+
+                state.lastSyncCount?.let { count ->
+                    Text(
+                        text = "Última sincronización: $count tareas pendientes",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
     }
 }
 

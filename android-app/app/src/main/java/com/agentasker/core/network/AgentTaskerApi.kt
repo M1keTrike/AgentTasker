@@ -17,9 +17,13 @@ import com.agentasker.features.kanban.data.datasources.remote.model.CreateKanban
 import com.agentasker.features.kanban.data.datasources.remote.model.KanbanColumnDTO
 import com.agentasker.features.kanban.data.datasources.remote.model.ReorderKanbanColumnsRequest
 import com.agentasker.features.kanban.data.datasources.remote.model.UpdateKanbanColumnRequest
+import com.agentasker.features.tasks.data.datasources.remote.model.BulkCreateSubtasksRequest
+import com.agentasker.features.tasks.data.datasources.remote.model.CreateSubtaskRequest
 import com.agentasker.features.tasks.data.datasources.remote.model.CreateTaskRequest
+import com.agentasker.features.tasks.data.datasources.remote.model.SubtaskDTO
 import com.agentasker.features.tasks.data.datasources.remote.model.TaskDTO
 import com.agentasker.features.tasks.data.datasources.remote.model.TaskResponse
+import com.agentasker.features.tasks.data.datasources.remote.model.UpdateSubtaskRequest
 import com.agentasker.features.tasks.data.datasources.remote.model.UpdateTaskRequest
 import retrofit2.Response
 import retrofit2.http.Body
@@ -45,6 +49,32 @@ interface AgentTaskerApi {
 
     @DELETE("tasks/{id}")
     suspend fun deleteTask(@Path("id") id: Int): Response<Unit>
+
+    // ---------- Subtasks ----------
+
+    @GET("tasks/{taskId}/subtasks")
+    suspend fun getSubtasks(@Path("taskId") taskId: Int): List<SubtaskDTO>
+
+    @POST("tasks/{taskId}/subtasks")
+    suspend fun createSubtask(
+        @Path("taskId") taskId: Int,
+        @Body request: CreateSubtaskRequest
+    ): SubtaskDTO
+
+    @POST("tasks/{taskId}/subtasks/bulk")
+    suspend fun createSubtasksBulk(
+        @Path("taskId") taskId: Int,
+        @Body request: BulkCreateSubtasksRequest
+    ): List<SubtaskDTO>
+
+    @PATCH("subtasks/{id}")
+    suspend fun updateSubtask(
+        @Path("id") id: Int,
+        @Body request: UpdateSubtaskRequest
+    ): SubtaskDTO
+
+    @DELETE("subtasks/{id}")
+    suspend fun deleteSubtask(@Path("id") id: Int): Response<Unit>
 
     @POST("auth/google")
     suspend fun signInWithGoogle(@Body request: GoogleSignInRequestDTO): AuthResponseDTO

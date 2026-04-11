@@ -6,6 +6,7 @@ data class TaskUiState(
     val isLoading: Boolean = false,
     val tasks: List<Task> = emptyList(),
     val error: String? = null,
+    val infoMessage: String? = null,
     val showDialog: Boolean = false,
     val taskToEdit: Task? = null,
     val formTitle: String = "",

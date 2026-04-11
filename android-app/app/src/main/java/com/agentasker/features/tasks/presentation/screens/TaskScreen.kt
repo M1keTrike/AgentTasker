@@ -60,6 +60,13 @@ fun TaskScreen(
         }
     }
 
+    LaunchedEffect(uiState.infoMessage) {
+        uiState.infoMessage?.let { message ->
+            snackbarHostState.showSnackbar(message)
+            viewModel.clearInfoMessage()
+        }
+    }
+
     if (uiState.showDialog) {
         TaskFormDialog(
             task = uiState.taskToEdit,
@@ -137,7 +144,9 @@ fun TaskScreen(
                                 },
                                 onDelete = {
                                     viewModel.deleteTask(task.id)
-                                }
+                                },
+                                onSplitWithAi = { viewModel.splitWithAi(task.id) },
+                                onToggleSubtask = { viewModel.toggleSubtask(it) }
                             )
                         }
                     }

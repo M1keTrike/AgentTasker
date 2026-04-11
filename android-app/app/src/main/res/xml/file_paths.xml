@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- getExternalFilesDir(Environment.DIRECTORY_PICTURES)/analyzer
+         es donde AnalyzerScreen escribe las fotos capturadas con la
+         cámara. Lo exponemos como content:// a través del FileProvider. -->
+    <external-files-path
+        name="analyzer_captures"
+        path="Pictures/analyzer/" />
+</paths>

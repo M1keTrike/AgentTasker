@@ -6,6 +6,7 @@ import com.agentasker.core.database.AppDatabase
 import com.agentasker.features.tasks.data.datasources.local.dao.TaskReminderDao
 import com.agentasker.features.classroom.data.datasources.local.dao.ClassroomTaskDao
 import com.agentasker.features.kanban.data.datasources.local.dao.KanbanColumnDao
+import com.agentasker.features.tasks.data.datasources.local.dao.SubtaskDao
 import com.agentasker.features.tasks.data.datasources.local.dao.TaskDao
 import dagger.Module
 import dagger.Provides
@@ -38,6 +39,11 @@ object DatabaseModule {
     @Provides
     fun provideTaskDao(database: AppDatabase): TaskDao {
         return database.taskDao()
+    }
+
+    @Provides
+    fun provideSubtaskDao(database: AppDatabase): SubtaskDao {
+        return database.subtaskDao()
     }
 
     @Provides

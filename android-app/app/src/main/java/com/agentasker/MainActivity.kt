@@ -13,8 +13,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.CameraAlt
 import androidx.compose.material.icons.outlined.Dashboard
-import androidx.compose.material.icons.outlined.School
 import androidx.compose.material.icons.outlined.TaskAlt
 import androidx.compose.material.icons.outlined.ViewColumn
 import androidx.compose.material3.Icon
@@ -37,7 +37,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.agentasker.core.navigation.ClassroomRoute
+import com.agentasker.core.navigation.AnalyzerRoute
 import com.agentasker.core.navigation.DashboardRoute
 import com.agentasker.core.navigation.FeatureNavGraph
 import com.agentasker.core.navigation.KanbanRoute
@@ -143,11 +143,13 @@ fun AgentTaskerApp(
         val target = deepLink ?: return@LaunchedEffect
         if (!loginUiState.isAuthenticated) return@LaunchedEffect
 
+        // DeepLink.Classroom redirige a Tasks: el tab Classroom ya no existe,
+        // las tasks importadas viven en la misma pantalla de "Tareas".
         val route: Any = when (target) {
             DeepLink.Dashboard -> DashboardRoute
             DeepLink.Tasks -> TasksRoute
             DeepLink.Kanban -> KanbanRoute
-            DeepLink.Classroom -> ClassroomRoute
+            DeepLink.Classroom -> TasksRoute
         }
 
         navController.navigate(route) {
@@ -213,7 +215,7 @@ private fun BottomNavBar(
         BottomNavItem("Panel de estado", Icons.Outlined.Dashboard, DashboardRoute, TextAlign.Center),
         BottomNavItem("Tareas", Icons.Outlined.TaskAlt, TasksRoute),
         BottomNavItem("Kanban", Icons.Outlined.ViewColumn, KanbanRoute),
-        BottomNavItem("Classroom", Icons.Outlined.School, ClassroomRoute)
+        BottomNavItem("Analyzer", Icons.Outlined.CameraAlt, AnalyzerRoute)
     )
 
     NavigationBar {

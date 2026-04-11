@@ -4,8 +4,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.agentasker.core.hardware.HapticFeedbackManager
 import com.agentasker.core.hardware.ReminderScheduler
+import com.agentasker.features.tasks.data.workers.TaskSyncScheduler
+import com.agentasker.features.tasks.domain.entities.Subtask
 import com.agentasker.features.tasks.domain.entities.Task
 import com.agentasker.features.tasks.domain.repositories.TaskReminderRepository
+import com.agentasker.features.tasks.domain.repositories.TaskRepository
 import com.agentasker.features.tasks.domain.usecases.CreateTaskUseCase
 import com.agentasker.features.tasks.domain.usecases.DeleteTaskUseCase
 import com.agentasker.features.tasks.domain.usecases.GetTasksUseCase
@@ -46,7 +49,9 @@ class TaskViewModel @Inject constructor(
     private val deleteTaskUseCase: DeleteTaskUseCase,
     private val hapticFeedbackManager: HapticFeedbackManager,
     private val reminderScheduler: ReminderScheduler,
-    private val taskReminderRepository: TaskReminderRepository
+    private val taskReminderRepository: TaskReminderRepository,
+    private val taskRepository: TaskRepository,
+    private val taskSyncScheduler: TaskSyncScheduler
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(TaskUiState())
@@ -255,5 +260,40 @@ class TaskViewModel @Inject constructor(
 
     fun updateFormReminderAt(reminderAt: Long?) {
         _uiState.value = _uiState.value.copy(formReminderAt = reminderAt)
+    }
+
+    // ---------- Subtasks + IA ----------
+
+    /**
+     * Encola el worker que pide a DeepSeek que descomponga la task en
+     * subtareas. El worker corre como foreground y sobrevive al kill de
+     * la app. El usuario verá una notificación de progreso y luego otra
+     * de éxito/fallo cuando termine. No bloqueamos la UI aquí.
+     */
+    fun splitWithAi(taskId: String) {
+        taskSyncScheduler.scheduleAiSplit(taskId)
+        _uiState.value = _uiState.value.copy(
+            infoMessage = "Generando subtareas con IA… verás una notificación cuando termine."
+        )
+    }
+
+    fun toggleSubtask(subtask: Subtask) {
+        viewModelScope.launch {
+            try {
+                taskRepository.updateSubtask(
+                    subtaskId = subtask.id,
+                    isCompleted = !subtask.isCompleted
+                )
+                hapticFeedbackManager.success()
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    error = e.message ?: "Error al actualizar la subtarea"
+                )
+            }
+        }
+    }
+
+    fun clearInfoMessage() {
+        _uiState.value = _uiState.value.copy(infoMessage = null)
     }
 }

@@ -10,6 +10,7 @@ import com.agentasker.features.dashboard.navigation.NavigationWrapperDashboard
 import com.agentasker.features.tasks.navigation.NavigationWrapperTasks
 import com.agentasker.features.classroom.navigation.NavigationWrapperClassroom
 import com.agentasker.features.kanban.navigation.NavigationWrapperKanban
+import com.agentasker.features.analyzer.navigation.NavigationWrapperAnalyzer
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -34,4 +35,8 @@ abstract class NavigationModule {
     @Binds
     @IntoSet
     abstract fun bindKanbanNavGraph(impl: NavigationWrapperKanban): FeatureNavGraph
+
+    @Binds
+    @IntoSet
+    abstract fun bindAnalyzerNavGraph(impl: NavigationWrapperAnalyzer): FeatureNavGraph
 }

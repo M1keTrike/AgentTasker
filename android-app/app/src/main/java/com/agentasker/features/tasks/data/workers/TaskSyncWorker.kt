@@ -6,9 +6,13 @@ import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.agentasker.core.network.AgentTaskerApi
+import com.agentasker.features.tasks.data.datasources.local.dao.SubtaskDao
 import com.agentasker.features.tasks.data.datasources.local.dao.TaskDao
+import com.agentasker.features.tasks.data.datasources.local.entities.SubtaskEntity
 import com.agentasker.features.tasks.data.datasources.local.mapper.toEntity
+import com.agentasker.features.tasks.data.datasources.remote.model.BulkCreateSubtasksRequest
 import com.agentasker.features.tasks.data.datasources.remote.model.CreateTaskRequest
+import com.agentasker.features.tasks.data.datasources.remote.model.UpdateSubtaskRequest
 import com.agentasker.features.tasks.data.datasources.remote.model.UpdateTaskRequest
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
@@ -19,19 +23,26 @@ class TaskSyncWorker @AssistedInject constructor(
     @Assisted appContext: Context,
     @Assisted workerParams: WorkerParameters,
     private val api: AgentTaskerApi,
-    private val taskDao: TaskDao
+    private val taskDao: TaskDao,
+    private val subtaskDao: SubtaskDao
 ) : CoroutineWorker(appContext, workerParams) {
 
     override suspend fun doWork(): Result {
         val pendingTasks = taskDao.getPendingTasks()
-        Log.d(TAG, "doWork started — pending=${pendingTasks.size}")
+        val pendingSubtasks = subtaskDao.getPending()
+        Log.d(
+            TAG,
+            "doWork started — pendingTasks=${pendingTasks.size} pendingSubtasks=${pendingSubtasks.size}"
+        )
 
-        if (pendingTasks.isEmpty()) {
+        if (pendingTasks.isEmpty() && pendingSubtasks.isEmpty()) {
             return Result.success()
         }
 
         var hasFailures = false
 
+        // ---------- Sync tasks primero: las subtasks dependen de un id
+        // remoto de task, así que conviene crear la task antes. ----------
         for (task in pendingTasks) {
             try {
                 Log.d(
@@ -46,13 +57,38 @@ class TaskSyncWorker @AssistedInject constructor(
                             description = task.description,
                             priority = task.priority,
                             status = task.status,
-                            dueDate = task.dueDate
+                            dueDate = task.dueDate,
+                            source = task.source,
+                            externalId = task.externalId,
+                            courseName = task.courseName,
+                            externalLink = task.externalLink
                         )
+                        val oldId = task.id
+                        // Capturamos los subtasks locales ANTES de borrar la
+                        // task: la FK con CASCADE los borraría al hacer
+                        // deleteTaskById, y queremos re-adjuntarlos al id
+                        // remoto tras la creación exitosa.
+                        val orphanSubtasks = subtaskDao.getByTaskId(oldId)
+
                         val response = api.createTask(request)
                         val syncedEntity = response.toEntity(isSynced = true)
-                        taskDao.deleteTaskById(task.id)
+                        taskDao.deleteTaskById(oldId) // CASCADE borra los subtasks también
                         taskDao.upsertTask(syncedEntity)
-                        Log.d(TAG, "  → created remote id=${response.id}")
+
+                        if (orphanSubtasks.isNotEmpty()) {
+                            val reassigned = orphanSubtasks.map {
+                                // Nuevo ID local para evitar colisionar con
+                                // el PK del viejo registro (ya borrado).
+                                it.copy(
+                                    id = "local_sub_${System.nanoTime()}_${it.position}",
+                                    taskId = syncedEntity.id,
+                                    pendingAction = "create",
+                                    isSynced = false
+                                )
+                            }
+                            subtaskDao.upsertAll(reassigned)
+                        }
+                        Log.d(TAG, "  → created remote id=${response.id} (+${orphanSubtasks.size} subtasks queued)")
                     }
 
                     "update" -> {
@@ -76,7 +112,6 @@ class TaskSyncWorker @AssistedInject constructor(
                     }
                 }
             } catch (e: HttpException) {
-                // Log DETALLADO del error HTTP para poder diagnosticar 4xx/5xx.
                 val body = try { e.response()?.errorBody()?.string() } catch (_: Exception) { null }
                 Log.e(
                     TAG,
@@ -90,6 +125,76 @@ class TaskSyncWorker @AssistedInject constructor(
                     "Exception syncing task id=${task.id} action=${task.pendingAction}: ${e.message}",
                     e,
                 )
+                hasFailures = true
+            }
+        }
+
+        // ---------- Subtasks ----------
+        // Re-fetch porque el paso anterior puede haber re-marcado algunas.
+        val subsToSync = subtaskDao.getPending()
+
+        // Agrupamos por taskId y acción "create" para aprovechar bulk.
+        val createsByTask = subsToSync
+            .filter { it.pendingAction == "create" && it.taskId.toIntOrNull() != null }
+            .groupBy { it.taskId }
+
+        for ((taskId, subs) in createsByTask) {
+            try {
+                val titles = subs.sortedBy { it.position }.map { it.title }
+                val response = api.createSubtasksBulk(
+                    taskId.toInt(),
+                    BulkCreateSubtasksRequest(subtasks = titles)
+                )
+                // Borrar los locales orphan y guardar los remotos.
+                subs.forEach { subtaskDao.deleteById(it.id) }
+                val synced = response.map { dto ->
+                    SubtaskEntity(
+                        id = dto.id.toString(),
+                        taskId = taskId,
+                        title = dto.title,
+                        isCompleted = dto.isCompleted,
+                        position = dto.position,
+                        createdAt = dto.createdAt,
+                        updatedAt = dto.updatedAt,
+                        isSynced = true
+                    )
+                }
+                subtaskDao.upsertAll(synced)
+                Log.d(TAG, "  → bulk created ${synced.size} subtasks for taskId=$taskId")
+            } catch (e: Exception) {
+                Log.e(TAG, "Exception bulk-creating subtasks for taskId=$taskId: ${e.message}", e)
+                hasFailures = true
+            }
+        }
+
+        // Updates y deletes individuales.
+        for (sub in subsToSync.filter { it.pendingAction == "update" && it.id.toIntOrNull() != null }) {
+            try {
+                val response = api.updateSubtask(
+                    sub.id.toInt(),
+                    UpdateSubtaskRequest(title = sub.title, isCompleted = sub.isCompleted)
+                )
+                subtaskDao.upsert(
+                    sub.copy(
+                        title = response.title,
+                        isCompleted = response.isCompleted,
+                        position = response.position,
+                        isSynced = true,
+                        pendingAction = null
+                    )
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "Exception updating subtask id=${sub.id}: ${e.message}", e)
+                hasFailures = true
+            }
+        }
+
+        for (sub in subsToSync.filter { it.pendingAction == "delete" && it.id.toIntOrNull() != null }) {
+            try {
+                api.deleteSubtask(sub.id.toInt())
+                subtaskDao.deleteById(sub.id)
+            } catch (e: Exception) {
+                Log.e(TAG, "Exception deleting subtask id=${sub.id}: ${e.message}", e)
                 hasFailures = true
             }
         }

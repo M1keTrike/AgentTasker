@@ -17,6 +17,16 @@ data class TaskDTO(
     val status: String = "pending",
     @SerializedName("dueDate")
     val dueDate: String? = null,
+    @SerializedName("source")
+    val source: String? = null,
+    @SerializedName("externalId")
+    val externalId: String? = null,
+    @SerializedName("courseName")
+    val courseName: String? = null,
+    @SerializedName("externalLink")
+    val externalLink: String? = null,
+    @SerializedName("subtasks")
+    val subtasks: List<SubtaskDTO>? = null,
     @SerializedName("createdAt")
     val createdAt: String?,
     @SerializedName("updatedAt")
@@ -33,7 +43,15 @@ data class CreateTaskRequest(
     @SerializedName("status")
     val status: String = "pending",
     @SerializedName("dueDate")
-    val dueDate: String? = null
+    val dueDate: String? = null,
+    @SerializedName("source")
+    val source: String? = null,
+    @SerializedName("externalId")
+    val externalId: String? = null,
+    @SerializedName("courseName")
+    val courseName: String? = null,
+    @SerializedName("externalLink")
+    val externalLink: String? = null
 )
 
 data class UpdateTaskRequest(
@@ -51,10 +69,40 @@ data class UpdateTaskRequest(
 
 data class SubtaskDTO(
     @SerializedName("id")
-    val id: String?,
+    val id: Int,
+    @SerializedName("taskId")
+    val taskId: Int,
     @SerializedName("title")
     val title: String,
     @SerializedName("isCompleted")
-    val isCompleted: Boolean?
+    val isCompleted: Boolean = false,
+    @SerializedName("position")
+    val position: Int = 0,
+    @SerializedName("createdAt")
+    val createdAt: String? = null,
+    @SerializedName("updatedAt")
+    val updatedAt: String? = null
 )
 
+data class CreateSubtaskRequest(
+    @SerializedName("title")
+    val title: String,
+    @SerializedName("isCompleted")
+    val isCompleted: Boolean? = null,
+    @SerializedName("position")
+    val position: Int? = null
+)
+
+data class UpdateSubtaskRequest(
+    @SerializedName("title")
+    val title: String? = null,
+    @SerializedName("isCompleted")
+    val isCompleted: Boolean? = null,
+    @SerializedName("position")
+    val position: Int? = null
+)
+
+data class BulkCreateSubtasksRequest(
+    @SerializedName("subtasks")
+    val subtasks: List<String>
+)
