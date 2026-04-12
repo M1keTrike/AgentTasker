@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
@@ -82,14 +83,14 @@ fun ColumnFormDialog(
                     label = { Text("Clave de estado") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    supportingText = { Text("Ej: pending, in_progress, review") }
+                    supportingText = { Text("Ej: Pendiente, En Progreso, En revisión") }
                 )
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
                     text = "Color",
                     style = MaterialTheme.typography.labelLarge
                 )
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(12.dp))
                 ColorSwatchPicker(
                     selectedColor = color,
                     onColorSelected = onColorChange

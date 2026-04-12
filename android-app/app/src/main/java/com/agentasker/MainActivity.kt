@@ -160,6 +160,19 @@ fun AgentTaskerApp(
         onDeepLinkConsumed()
     }
 
+    // Cuando la sesión muere (TokenAuthenticator llama clearAll() tras 401
+    // irrecuperable → observeAuthStateUseCase emite false → LoginUiState
+    // se resetea), este LaunchedEffect fuerza navegación al Login y limpia
+    // el back stack. Sin esto, el usuario queda atrapado en Dashboard con
+    // 401 permanentes porque NavHost no re-evalúa startDestination.
+    LaunchedEffect(loginUiState.isAuthenticated) {
+        if (!loginUiState.isAuthenticated) {
+            navController.navigate(LoginRoute) {
+                popUpTo(0) { inclusive = true }
+            }
+        }
+    }
+
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
 

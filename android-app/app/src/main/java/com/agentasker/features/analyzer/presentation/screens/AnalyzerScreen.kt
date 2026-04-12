@@ -8,6 +8,8 @@ import android.os.Environment
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -118,10 +120,15 @@ fun AnalyzerScreen(
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { innerPadding ->
+        // verticalScroll obligatorio: el Card de preview + botones +
+        // texto de ayuda desborda en pantallas chicas, y sin scroll el
+        // botón "Analizar con IA" quedaba clipeado a ~8dp (el bug que
+        // viste como "barra rosa").
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
+                .verticalScroll(rememberScrollState())
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
@@ -183,7 +190,10 @@ fun AnalyzerScreen(
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .aspectRatio(4f / 3f),
+                    // 16:10 en vez de 4:3 para dejar espacio al botón
+                    // de análisis sin necesidad de scroll en pantallas
+                    // medianas. El scroll sigue habilitado por si acaso.
+                    .aspectRatio(16f / 10f),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surfaceVariant
                 ),

@@ -19,4 +19,12 @@ interface ClassroomRepository {
      * Devuelve el número de tasks importadas.
      */
     suspend fun syncClassroomTasksToLocal(): Result<Int>
+
+    /**
+     * Igual que [syncClassroomTasksToLocal] pero solo importa tasks de los
+     * cursos cuyo ID está en [courseIds]. Usado por el picker de cursos
+     * del Dashboard. Se llama a `getClassroomTasksByCourse(courseId)` por
+     * cada uno, en vez de `getAllClassroomTasks()`.
+     */
+    suspend fun syncClassroomTasksByCourses(courseIds: List<String>): Result<Int>
 }

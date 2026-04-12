@@ -4,6 +4,7 @@ import android.content.Intent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.agentasker.features.classroom.data.services.ClassroomAuthService
+import com.agentasker.features.classroom.domain.entities.ClassroomCourse
 import com.agentasker.features.classroom.domain.repositories.ClassroomRepository
 import com.agentasker.features.classroom.domain.usecases.ConnectClassroomUseCase
 import com.agentasker.features.classroom.domain.usecases.SyncClassroomToTasksUseCase
@@ -15,16 +16,18 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-/**
- * Estado de la sección "Integraciones → Classroom" del Dashboard.
- */
 data class ClassroomIntegrationUiState(
     val isConnected: Boolean = false,
     val isConnecting: Boolean = false,
     val isSyncing: Boolean = false,
     val lastSyncCount: Int? = null,
     val error: String? = null,
-    val infoMessage: String? = null
+    val infoMessage: String? = null,
+    // Picker de cursos
+    val courses: List<ClassroomCourse> = emptyList(),
+    val selectedCourseIds: Set<String> = emptySet(),
+    val showCoursePicker: Boolean = false,
+    val isLoadingCourses: Boolean = false
 )
 
 @HiltViewModel
@@ -48,16 +51,15 @@ class ClassroomIntegrationViewModel @Inject constructor(
             classroomRepository.isClassroomConnected().fold(
                 onSuccess = { connected ->
                     _uiState.value = _uiState.value.copy(isConnected = connected)
+                    if (connected && _uiState.value.courses.isEmpty()) {
+                        loadCourses()
+                    }
                 },
                 onFailure = { /* si falla, dejamos el estado como estaba */ }
             )
         }
     }
 
-    /**
-     * Devuelve el Intent para abrir el consentimiento OAuth. El llamador lo
-     * pasa a un `ActivityResultLauncher`. Al volver, se llama `onAuthResult`.
-     */
     fun createAuthIntent(): Intent = classroomAuthService.createAuthIntent()
 
     fun onAuthResult(data: Intent) {
@@ -92,8 +94,9 @@ class ClassroomIntegrationViewModel @Inject constructor(
                     _uiState.value = _uiState.value.copy(
                         isConnecting = false,
                         isConnected = true,
-                        infoMessage = "Classroom conectado. Puedes sincronizar tus tareas."
+                        infoMessage = "Classroom conectado. Elige los cursos a sincronizar."
                     )
+                    loadCourses()
                 },
                 onFailure = { error ->
                     _uiState.value = _uiState.value.copy(
@@ -105,15 +108,79 @@ class ClassroomIntegrationViewModel @Inject constructor(
         }
     }
 
-    fun syncNow() {
+    // ---------- Picker de cursos ----------
+
+    fun loadCourses() {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isSyncing = true, error = null)
-            syncClassroomToTasksUseCase().fold(
+            _uiState.value = _uiState.value.copy(isLoadingCourses = true)
+            classroomRepository.getCourses().fold(
+                onSuccess = { courses ->
+                    _uiState.value = _uiState.value.copy(
+                        isLoadingCourses = false,
+                        courses = courses,
+                        // Pre-seleccionar todos por defecto
+                        selectedCourseIds = if (_uiState.value.selectedCourseIds.isEmpty())
+                            courses.map { it.id }.toSet()
+                        else
+                            _uiState.value.selectedCourseIds
+                    )
+                },
+                onFailure = { error ->
+                    _uiState.value = _uiState.value.copy(
+                        isLoadingCourses = false,
+                        error = error.message ?: "Error al cargar cursos"
+                    )
+                }
+            )
+        }
+    }
+
+    fun showCoursePicker() {
+        if (_uiState.value.courses.isEmpty()) loadCourses()
+        _uiState.value = _uiState.value.copy(showCoursePicker = true)
+    }
+
+    fun hideCoursePicker() {
+        _uiState.value = _uiState.value.copy(showCoursePicker = false)
+    }
+
+    fun toggleCourse(courseId: String) {
+        val current = _uiState.value.selectedCourseIds.toMutableSet()
+        if (current.contains(courseId)) current.remove(courseId)
+        else current.add(courseId)
+        _uiState.value = _uiState.value.copy(selectedCourseIds = current)
+    }
+
+    fun selectAllCourses() {
+        _uiState.value = _uiState.value.copy(
+            selectedCourseIds = _uiState.value.courses.map { it.id }.toSet()
+        )
+    }
+
+    fun deselectAllCourses() {
+        _uiState.value = _uiState.value.copy(selectedCourseIds = emptySet())
+    }
+
+    /**
+     * Sincroniza solo los cursos seleccionados en el picker.
+     * Cierra el picker y muestra snackbar con resultado.
+     */
+    fun syncSelectedCourses() {
+        val ids = _uiState.value.selectedCourseIds.toList()
+        if (ids.isEmpty()) return
+
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                isSyncing = true,
+                showCoursePicker = false,
+                error = null
+            )
+            syncClassroomToTasksUseCase(ids).fold(
                 onSuccess = { count ->
                     _uiState.value = _uiState.value.copy(
                         isSyncing = false,
                         lastSyncCount = count,
-                        infoMessage = "Se importaron $count tareas pendientes."
+                        infoMessage = "Se importaron $count tareas pendientes de ${ids.size} curso(s)."
                     )
                 },
                 onFailure = { error ->

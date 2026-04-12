@@ -420,15 +420,32 @@ class TaskRepositoryImpl @Inject constructor(
     // ---------- Classroom import ----------
 
     override suspend fun upsertImportedTask(task: Task): Task {
-        // Busca por externalId si ya existe (en Room no tenemos userId, la FK
-        // lógica es externalId que es único a nivel Classroom).
-        val existing = task.externalId?.let { ext ->
-            // Query rápida: Room no tiene índice por externalId, pero el
-            // volumen es pequeño. Si hace falta, añadir índice.
-            taskDao.getAllTasks().first().firstOrNull { it.externalId == ext }
+        // Buscamos por externalId usando una query directa que NO filtra
+        // por isArchived — si ya existe (incluso archivada), queremos
+        // preservar los flags locales en vez de re-importarla como nueva.
+        val existing = task.externalId?.let { taskDao.findByExternalId(it) }
+
+        // Si el usuario borró manualmente la Classroom task (quedó con
+        // pendingAction="delete"), respetamos esa decisión y no la
+        // re-importamos. Caso contrario sería confuso: el usuario la
+        // borra, toca sync, y la task reaparece como zombie.
+        if (existing?.pendingAction == "delete") {
+            return existing.toDomain()
         }
+
         val entity = if (existing != null) {
-            task.toEntity(isSynced = true).copy(id = existing.id)
+            // Actualizamos campos "de Classroom" (título, descripción,
+            // fechas, etc.) pero preservamos el estado local que el
+            // usuario pudo haber cambiado: isArchived, status (si la
+            // tenía como completed/in_progress), y el ID local.
+            task.toEntity(isSynced = true).copy(
+                id = existing.id,
+                isArchived = existing.isArchived,
+                // Si el usuario ya marcó la task como completed o
+                // in_progress, respetamos su decisión. Solo pisamos si
+                // sigue en pending.
+                status = if (existing.status == "pending") task.status else existing.status
+            )
         } else {
             task.toEntity(isSynced = true)
         }

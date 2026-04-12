@@ -110,6 +110,18 @@ fun DashboardScreen(
         }
     }
 
+    // Picker de cursos — se abre cuando el usuario toca "Sincronizar Classroom"
+    if (classroomState.showCoursePicker) {
+        CoursePickerDialog(
+            state = classroomState,
+            onToggleCourse = classroomViewModel::toggleCourse,
+            onSelectAll = classroomViewModel::selectAllCourses,
+            onDeselectAll = classroomViewModel::deselectAllCourses,
+            onConfirm = classroomViewModel::syncSelectedCourses,
+            onDismiss = classroomViewModel::hideCoursePicker
+        )
+    }
+
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
@@ -144,7 +156,7 @@ fun DashboardScreen(
                     onConnectClassroom = {
                         authLauncher.launch(classroomViewModel.createAuthIntent())
                     },
-                    onSyncClassroom = { classroomViewModel.syncNow() },
+                    onSyncClassroom = { classroomViewModel.showCoursePicker() },
                     onDeleteArchived = { taskId ->
                         viewModel.deleteArchivedPermanently(taskId)
                     },
@@ -330,6 +342,7 @@ private fun ClassroomIntegrationCard(
                     Text("Conectar con Classroom")
                 }
             } else {
+                // Botón abre el picker de cursos en vez de sync directo
                 OutlinedButton(
                     onClick = onSync,
                     enabled = !state.isSyncing,
@@ -351,7 +364,7 @@ private fun ClassroomIntegrationCard(
                     }
                     Text(
                         if (state.isSyncing) "Sincronizando…"
-                        else "Sincronizar tareas pendientes"
+                        else "Sincronizar Classroom"
                     )
                 }
 
@@ -365,6 +378,125 @@ private fun ClassroomIntegrationCard(
             }
         }
     }
+}
+
+/**
+ * Dialog que muestra los cursos del usuario con checkboxes para elegir
+ * cuáles sincronizar. Se abre desde el botón "Sincronizar Classroom"
+ * de la ClassroomIntegrationCard.
+ */
+@Composable
+private fun CoursePickerDialog(
+    state: ClassroomIntegrationUiState,
+    onToggleCourse: (String) -> Unit,
+    onSelectAll: () -> Unit,
+    onDeselectAll: () -> Unit,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val selectedCount = state.selectedCourseIds.size
+    val allSelected = state.courses.isNotEmpty() &&
+        selectedCount == state.courses.size
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Seleccionar cursos") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (state.isLoadingCourses) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(strokeWidth = 2.dp)
+                    }
+                } else if (state.courses.isEmpty()) {
+                    Text(
+                        text = "No se encontraron cursos activos.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                } else {
+                    // Toggle all
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        TextButton(
+                            onClick = { if (allSelected) onDeselectAll() else onSelectAll() }
+                        ) {
+                            Text(
+                                text = if (allSelected) "Deseleccionar todos"
+                                else "Seleccionar todos",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        Spacer(modifier = Modifier.weight(1f))
+                        Text(
+                            text = "$selectedCount/${state.courses.size}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    // Lista de cursos
+                    state.courses.forEach { course ->
+                        val isSelected = course.id in state.selectedCourseIds
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(
+                                    if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                                    else Color.Transparent
+                                )
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            androidx.compose.material3.Checkbox(
+                                checked = isSelected,
+                                onCheckedChange = { onToggleCourse(course.id) }
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = course.name,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    maxLines = 2
+                                )
+                                course.section?.let { section ->
+                                    Text(
+                                        text = section,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                enabled = selectedCount > 0 && !state.isLoadingCourses
+            ) {
+                Text(
+                    if (selectedCount > 0) "Sincronizar ($selectedCount)"
+                    else "Sincronizar"
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancelar")
+            }
+        }
+    )
 }
 
 @Composable

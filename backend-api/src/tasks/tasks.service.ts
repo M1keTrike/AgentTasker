@@ -74,18 +74,18 @@ export class TasksService {
   ): Promise<Task> {
     const task = await this.findOne(id, userId);
 
-    // `task.dueDate` viene de la DB como Date; el DTO la trae como string ISO.
-    // Normalizamos a millis con un helper para poder compararlos sin crashes.
-    const previousDueDateMillis = toMillis(task.dueDate);
-
     Object.assign(task, updateTaskDto);
 
-    // Tras el assign, task.dueDate puede ser string (del DTO) o Date (si no
-    // se envió). Re-normalizamos para comparar y, si cambió, convertimos el
-    // string a Date real para que TypeORM lo persista como timestamp.
-    const newDueDateMillis = toMillis(task.dueDate);
-
-    if (previousDueDateMillis !== newDueDateMillis) {
+    // Siempre re-armamos el reminder cuando el usuario edita la task. Si
+    // el dueDate ya venció y el cron ya disparó el push (reminderSent=true),
+    // un edit desde la app significa que el usuario quiere que el reminder
+    // pueda volver a funcionar — por ejemplo si actualiza la fecha o
+    // simplemente quiere re-recibir el aviso tras cambiar el contenido.
+    //
+    // Antes solo lo reseteábamos cuando `dueDate` cambiaba, lo que dejaba
+    // `reminderSent=true` en ediciones de título/descripción/prioridad.
+    // Eso causaba que el cron nunca volviera a considerar la task.
+    if (task.dueDate != null) {
       task.reminderSent = false;
     }
 

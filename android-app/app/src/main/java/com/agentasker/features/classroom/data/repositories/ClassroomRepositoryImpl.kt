@@ -118,7 +118,7 @@ class ClassroomRepositoryImpl @Inject constructor(
         return try {
             val remote = api.getAllClassroomTasks()
             val pending = remote.toDomainTasks().filter { it.submissionState in PENDING_STATES }
-            Log.d(TAG, "sync: ${remote.size} remote -> ${pending.size} pending to import")
+            Log.d(TAG, "syncAll: ${remote.size} remote -> ${pending.size} pending to import")
 
             pending.forEach { ct ->
                 val task = ct.toLocalTask()
@@ -128,6 +128,27 @@ class ClassroomRepositoryImpl @Inject constructor(
             Result.success(pending.size)
         } catch (e: Exception) {
             Log.e(TAG, "syncClassroomTasksToLocal failed: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun syncClassroomTasksByCourses(courseIds: List<String>): Result<Int> {
+        if (courseIds.isEmpty()) return Result.success(0)
+        return try {
+            var total = 0
+            for (courseId in courseIds) {
+                val remote = api.getClassroomTasksByCourse(courseId)
+                val pending = remote.toDomainTasks().filter { it.submissionState in PENDING_STATES }
+                Log.d(TAG, "syncByCourse($courseId): ${remote.size} remote -> ${pending.size} pending")
+
+                pending.forEach { ct ->
+                    taskRepository.upsertImportedTask(ct.toLocalTask())
+                }
+                total += pending.size
+            }
+            Result.success(total)
+        } catch (e: Exception) {
+            Log.e(TAG, "syncClassroomTasksByCourses failed: ${e.message}", e)
             Result.failure(e)
         }
     }
