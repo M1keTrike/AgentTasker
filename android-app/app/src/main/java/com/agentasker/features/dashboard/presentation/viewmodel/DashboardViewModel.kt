@@ -3,10 +3,8 @@ package com.agentasker.features.dashboard.presentation.viewmodel
 import android.annotation.SuppressLint
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.agentasker.features.classroom.domain.entities.ClassroomTask
-import com.agentasker.features.classroom.domain.entities.SubmissionState
-import com.agentasker.features.classroom.domain.usecases.GetClassroomTasksUseCase
 import com.agentasker.features.tasks.domain.entities.Task
+import com.agentasker.features.tasks.domain.entities.TaskSource
 import com.agentasker.features.tasks.domain.repositories.TaskRepository
 import com.agentasker.features.tasks.domain.usecases.GetTasksUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -15,7 +13,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
+import java.time.Instant
 import java.time.LocalDateTime
+import java.time.ZoneId
 import javax.inject.Inject
 
 data class CourseInfo(
@@ -46,10 +46,17 @@ sealed interface DashboardUiState {
     data class Error(val message: String) : DashboardUiState
 }
 
+/**
+ * ViewModel del Dashboard. Ahora se alimenta SOLO de la tabla local `tasks`
+ * (Room), que ya incluye las tasks de Classroom sincronizadas. Ya NO llama
+ * a `getClassroomTasksUseCase()` (API de Google) — eso eliminó:
+ *  - Llamadas extras a Google (evitando 429)
+ *  - Cursos no-sincronizados apareciendo en las estadísticas
+ *  - Conteos duplicados (tasks locales + tasks remotas de Classroom)
+ */
 @HiltViewModel
 class DashboardViewModel @Inject constructor(
     private val getTasksUseCase: GetTasksUseCase,
-    private val getClassroomTasksUseCase: GetClassroomTasksUseCase,
     private val taskRepository: TaskRepository
 ) : ViewModel() {
 
@@ -71,29 +78,17 @@ class DashboardViewModel @Inject constructor(
                 getTasksUseCase.refresh()
             } catch (_: Exception) { }
 
-            // Combinamos el flow de tasks activas con el de archivadas
-            // para que la sección "Archivados" del Dashboard se actualice
-            // en vivo cuando el usuario archive o restaure una task.
             combine(
                 getTasksUseCase(),
                 taskRepository.observeArchivedTasks()
             ) { tasks, archived ->
                 tasks to archived
             }.collect { (tasks, archived) ->
-                val classroomTasks = try {
-                    getClassroomTasksUseCase().getOrDefault(emptyList())
-                } catch (_: Exception) {
-                    emptyList()
-                }
-                _uiState.value = buildSuccessState(tasks, classroomTasks, archived)
+                _uiState.value = buildSuccessState(tasks, archived)
             }
         }
     }
 
-    /**
-     * Elimina permanentemente una task archivada. No hay papelera — este
-     * es el borrado definitivo que el usuario pide desde el Dashboard.
-     */
     fun deleteArchivedPermanently(taskId: String) {
         viewModelScope.launch {
             try {
@@ -102,9 +97,6 @@ class DashboardViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Desarchiva una task — vuelve al tab Tareas.
-     */
     fun restoreArchived(taskId: String) {
         viewModelScope.launch {
             try {
@@ -124,66 +116,68 @@ class DashboardViewModel @Inject constructor(
     @SuppressLint("NewApi")
     private fun buildSuccessState(
         tasks: List<Task>,
-        classroomTasks: List<ClassroomTask>,
         archivedTasks: List<Task>
     ): DashboardUiState.Success {
         val now = LocalDateTime.now()
         val threeDaysFromNow = now.plusDays(3)
 
-        val pendingClassroom = classroomTasks.filter {
-            it.submissionState != SubmissionState.TURNED_IN
-        }
-
-        val upcomingItems = mutableListOf<UpcomingItem>()
-
-        classroomTasks.forEach { ct ->
-            upcomingItems.add(
-                UpcomingItem(
-                    title = ct.title,
-                    courseName = ct.courseName,
-                    dueDate = ct.dueDate,
-                    isClassroom = true
-                )
+        // --- Próximas entregas: de TODAS las tasks locales con dueDate ---
+        val upcomingItems = tasks.mapNotNull { task ->
+            val dueLocal = task.dueDate?.toLocalDateTimeOrNull() ?: return@mapNotNull null
+            UpcomingItem(
+                title = task.title,
+                courseName = task.courseName,
+                dueDate = dueLocal,
+                isClassroom = task.source == TaskSource.CLASSROOM
             )
         }
-
-        tasks.forEach { t ->
-            upcomingItems.add(
-                UpcomingItem(
-                    title = t.title,
-                    courseName = null,
-                    dueDate = null,
-                    isClassroom = false
-                )
-            )
-        }
-
-        val sortedUpcoming = upcomingItems
-            .sortedWith(compareBy(nullsLast()) { it.dueDate })
+            .sortedBy { it.dueDate }
             .take(5)
 
-        val dueSoonCount = classroomTasks.count { ct ->
-            ct.dueDate != null &&
-                ct.dueDate.isAfter(now) &&
-                ct.dueDate.isBefore(threeDaysFromNow) &&
-                ct.submissionState != SubmissionState.TURNED_IN
+        // --- Por vencer: tasks con dueDate en los próximos 3 días ---
+        val dueSoonCount = tasks.count { task ->
+            val dl = task.dueDate?.toLocalDateTimeOrNull() ?: return@count false
+            dl.isAfter(now) && dl.isBefore(threeDaysFromNow)
         }
 
-        val activeCourses = pendingClassroom
-            .groupBy { it.courseName }
-            .map { (name, courseTasks) -> CourseInfo(name, courseTasks.size) }
+        // --- Cursos activos: solo de tasks de Classroom YA sincronizadas ---
+        val classroomTasks = tasks.filter { it.source == TaskSource.CLASSROOM }
+        val activeCourses = classroomTasks
+            .mapNotNull { it.courseName }
+            .groupingBy { it }
+            .eachCount()
+            .map { (name, count) -> CourseInfo(name, count) }
+            .sortedByDescending { it.pendingCount }
 
         return DashboardUiState.Success(
-            pendingCount = tasks.size + pendingClassroom.size,
-            completedCount = archivedTasks.size +
-                classroomTasks.count { it.submissionState == SubmissionState.TURNED_IN },
+            // Pendientes = tasks activas (no archivadas, Room ya filtra eso)
+            pendingCount = tasks.size,
+            // Completadas = solo las archivadas (el flujo explícito del usuario)
+            completedCount = archivedTasks.size,
             dueSoonCount = dueSoonCount,
-            upcomingDeadlines = sortedUpcoming,
+            upcomingDeadlines = upcomingItems,
             highPriorityCount = tasks.count { it.priority.lowercase() == "high" },
             mediumPriorityCount = tasks.count { it.priority.lowercase() == "medium" },
             lowPriorityCount = tasks.count { it.priority.lowercase() == "low" },
             activeCourses = activeCourses,
             archivedTasks = archivedTasks
         )
+    }
+}
+
+/**
+ * Parsea un string ISO 8601 (como "2026-04-12T16:50:00.000Z" o
+ * "2026-05-24T04:59:00") a [LocalDateTime] en la zona horaria local.
+ * Retorna null si el formato no es válido.
+ */
+@SuppressLint("NewApi")
+private fun String.toLocalDateTimeOrNull(): LocalDateTime? = try {
+    val instant = Instant.parse(this)
+    LocalDateTime.ofInstant(instant, ZoneId.systemDefault())
+} catch (_: Exception) {
+    try {
+        LocalDateTime.parse(this)
+    } catch (_: Exception) {
+        null
     }
 }

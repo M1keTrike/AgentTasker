@@ -434,22 +434,34 @@ class TaskRepositoryImpl @Inject constructor(
         }
 
         val entity = if (existing != null) {
-            // Actualizamos campos "de Classroom" (título, descripción,
-            // fechas, etc.) pero preservamos el estado local que el
-            // usuario pudo haber cambiado: isArchived, status (si la
-            // tenía como completed/in_progress), y el ID local.
-            task.toEntity(isSynced = true).copy(
+            // Ya existe en Room. Actualizamos campos "de Classroom" pero
+            // preservamos los flags locales (isArchived, status, sync flags).
+            // Si ya tiene un id numérico (fue creada en el backend), la
+            // marcamos como "update" pendiente; si no, sigue como estaba.
+            val needsSync = existing.id.toIntOrNull() != null
+            task.toEntity(
+                isSynced = if (needsSync) false else existing.isSynced,
+                pendingAction = if (needsSync) "update" else existing.pendingAction
+            ).copy(
                 id = existing.id,
                 isArchived = existing.isArchived,
-                // Si el usuario ya marcó la task como completed o
-                // in_progress, respetamos su decisión. Solo pisamos si
-                // sigue en pending.
                 status = if (existing.status == "pending") task.status else existing.status
             )
         } else {
-            task.toEntity(isSynced = true)
+            // NUEVA: no existía en Room. La marcamos como pendiente de
+            // crear en el backend para que el TaskSyncWorker la suba y
+            // el cron de reminders pueda actuar sobre ella. Sin esto las
+            // Classroom tasks vivían solo en Room y nunca aparecían en
+            // Postgres → los reminders y la UI web no las veían.
+            task.toEntity(isSynced = false, pendingAction = "create")
         }
         taskDao.upsertTask(entity)
+
+        // Si creamos o actualizamos con pendingAction, disparamos el sync.
+        if (entity.pendingAction != null) {
+            syncScheduler.scheduleSyncOnConnectivity()
+        }
+
         return entity.toDomain()
     }
 }

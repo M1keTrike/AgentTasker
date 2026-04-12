@@ -5,7 +5,7 @@ import {
   IsOptional,
   IsString,
 } from 'class-validator';
-import { TaskPriority, TaskStatus } from '../entities/task.entity';
+import { TaskPriority, TaskSource, TaskStatus } from '../entities/task.entity';
 
 export class CreateTaskDto {
   @IsString()
@@ -13,8 +13,8 @@ export class CreateTaskDto {
   title: string;
 
   @IsString()
-  @IsNotEmpty()
-  description: string;
+  @IsOptional()
+  description?: string;
 
   @IsEnum(TaskPriority)
   @IsOptional()
@@ -27,4 +27,20 @@ export class CreateTaskDto {
   @IsDateString()
   @IsOptional()
   dueDate?: string;
+
+  @IsEnum(TaskSource)
+  @IsOptional()
+  source?: TaskSource;
+
+  @IsString()
+  @IsOptional()
+  externalId?: string;
+
+  @IsString()
+  @IsOptional()
+  courseName?: string;
+
+  @IsString()
+  @IsOptional()
+  externalLink?: string;
 }
