@@ -95,7 +95,6 @@ class AiImageAnalysisWorker @AssistedInject constructor(
                 taskRepository.createSubtasksBulk(created.id, draft.subtasks)
             }
 
-            hapticFeedbackManager.notification()
             notificationHelper.showAiResultNotification(
                 title = "Tarea creada",
                 body = "'${draft.title}' con ${draft.subtasks.size} subtareas.",

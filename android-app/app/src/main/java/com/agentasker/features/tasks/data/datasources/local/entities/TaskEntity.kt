@@ -16,6 +16,7 @@ data class TaskEntity(
     val externalId: String? = null,
     val courseName: String? = null,
     val externalLink: String? = null,
+    val isArchived: Boolean = false,
     val createdAt: String? = null,
     val updatedAt: String? = null,
     val isSynced: Boolean = true,

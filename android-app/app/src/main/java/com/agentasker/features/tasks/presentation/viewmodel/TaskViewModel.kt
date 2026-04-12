@@ -269,9 +269,21 @@ class TaskViewModel @Inject constructor(
      * subtareas. El worker corre como foreground y sobrevive al kill de
      * la app. El usuario verá una notificación de progreso y luego otra
      * de éxito/fallo cuando termine. No bloqueamos la UI aquí.
+     *
+     * Si la task ya tiene subtasks (manuales o de IA anterior), estas se
+     * sobreescriben — el worker llama a `replaceSubtasks()` en el repo.
+     *
+     * Si la task no tiene descripción, se rechaza la acción con un mensaje
+     * al usuario — sin descripción no hay contexto para dividir.
      */
-    fun splitWithAi(taskId: String) {
-        taskSyncScheduler.scheduleAiSplit(taskId)
+    fun splitWithAi(task: Task) {
+        if (task.description.isBlank()) {
+            _uiState.value = _uiState.value.copy(
+                error = "La tarea necesita una descripción para poder dividirla con IA."
+            )
+            return
+        }
+        taskSyncScheduler.scheduleAiSplit(task.id)
         _uiState.value = _uiState.value.copy(
             infoMessage = "Generando subtareas con IA… verás una notificación cuando termine."
         )
@@ -288,6 +300,78 @@ class TaskViewModel @Inject constructor(
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     error = e.message ?: "Error al actualizar la subtarea"
+                )
+            }
+        }
+    }
+
+    /**
+     * Handler del botón verde "Completar y archivar" que aparece cuando
+     * todas las subtasks están tachadas. Marca la task como completed +
+     * archived y cancela cualquier recordatorio local asociado.
+     */
+    fun completeAndArchive(taskId: String) {
+        viewModelScope.launch {
+            try {
+                taskRepository.completeAndArchive(taskId)
+                taskReminderRepository.deleteReminder(taskId)
+                reminderScheduler.cancelReminder(taskId)
+                hapticFeedbackManager.success()
+                _uiState.value = _uiState.value.copy(
+                    infoMessage = "Tarea completada y archivada."
+                )
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    error = e.message ?: "Error al completar la tarea"
+                )
+            }
+        }
+    }
+
+    /**
+     * Añade una subtarea manual a la task que se está editando en el
+     * dialog. Se persiste inmediatamente (offline-first) para que
+     * aparezca en la lista observada por el form.
+     */
+    fun addManualSubtask(taskId: String, title: String) {
+        if (title.isBlank()) return
+        viewModelScope.launch {
+            try {
+                taskRepository.createSubtask(taskId, title.trim())
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    error = e.message ?: "Error al agregar subtarea"
+                )
+            }
+        }
+    }
+
+    /**
+     * Renombra una subtarea existente desde el dialog de edición.
+     */
+    fun renameSubtask(subtaskId: String, newTitle: String) {
+        if (newTitle.isBlank()) return
+        viewModelScope.launch {
+            try {
+                taskRepository.updateSubtask(subtaskId = subtaskId, title = newTitle.trim())
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    error = e.message ?: "Error al renombrar subtarea"
+                )
+            }
+        }
+    }
+
+    /**
+     * Borra una subtarea desde el dialog de edición.
+     */
+    fun deleteSubtask(subtaskId: String) {
+        viewModelScope.launch {
+            try {
+                taskRepository.deleteSubtask(subtaskId)
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    error = e.message ?: "Error al eliminar subtarea"
                 )
             }
         }

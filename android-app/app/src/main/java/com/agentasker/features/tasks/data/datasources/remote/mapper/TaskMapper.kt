@@ -29,6 +29,7 @@ fun TaskDTO.toDomain(): Task {
         externalId = externalId,
         courseName = courseName,
         externalLink = externalLink,
+        isArchived = isArchived ?: false,
         subtasks = subtasks?.map { it.toDomain() } ?: emptyList(),
         createdAt = createdAt,
         updatedAt = updatedAt

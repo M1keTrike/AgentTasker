@@ -68,16 +68,31 @@ fun TaskScreen(
     }
 
     if (uiState.showDialog) {
+        // Cuando editamos una task existente mostramos también su lista
+        // de subtasks para que el usuario pueda editar/agregar/borrar
+        // manualmente. Para tasks nuevas no hay id todavía, así que la
+        // sección solo existe en modo edición.
+        val editingTaskId = uiState.taskToEdit?.id
+        val subtasksForEditing = editingTaskId?.let { id ->
+            uiState.tasks.firstOrNull { it.id == id }?.subtasks.orEmpty()
+        } ?: emptyList()
+
         TaskFormDialog(
             task = uiState.taskToEdit,
             title = uiState.formTitle,
             description = uiState.formDescription,
             priority = uiState.formPriority,
             reminderAt = uiState.formReminderAt,
+            subtasks = subtasksForEditing,
             onTitleChange = viewModel::updateFormTitle,
             onDescriptionChange = viewModel::updateFormDescription,
             onPriorityChange = viewModel::updateFormPriority,
             onReminderAtChange = viewModel::updateFormReminderAt,
+            onAddSubtask = { title ->
+                editingTaskId?.let { viewModel.addManualSubtask(it, title) }
+            },
+            onRenameSubtask = viewModel::renameSubtask,
+            onDeleteSubtask = viewModel::deleteSubtask,
             onDismiss = {
                 viewModel.hideDialog()
             },
@@ -145,8 +160,9 @@ fun TaskScreen(
                                 onDelete = {
                                     viewModel.deleteTask(task.id)
                                 },
-                                onSplitWithAi = { viewModel.splitWithAi(task.id) },
-                                onToggleSubtask = { viewModel.toggleSubtask(it) }
+                                onSplitWithAi = { viewModel.splitWithAi(task) },
+                                onToggleSubtask = { viewModel.toggleSubtask(it) },
+                                onComplete = { viewModel.completeAndArchive(task.id) }
                             )
                         }
                     }

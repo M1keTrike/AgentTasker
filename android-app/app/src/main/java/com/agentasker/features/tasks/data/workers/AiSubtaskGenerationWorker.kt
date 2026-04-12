@@ -69,6 +69,17 @@ class AiSubtaskGenerationWorker @AssistedInject constructor(
             return Result.failure()
         }
 
+        // Si la task no tiene descripción, rechazamos aquí también como
+        // defensa en profundidad (la UI ya valida, pero el worker puede
+        // ser invocado directamente).
+        if (task.description.isBlank()) {
+            notifyResult(
+                success = false,
+                body = "La tarea necesita una descripción para poder dividirla con IA."
+            )
+            return Result.failure()
+        }
+
         return try {
             val titles = aiTaskService.splitIntoSubtasks(task.title, task.description)
             Log.d(TAG, "DeepSeek returned ${titles.size} subtasks")
@@ -78,10 +89,10 @@ class AiSubtaskGenerationWorker @AssistedInject constructor(
                 return Result.failure()
             }
 
-            // Escribe vía el repository para que aplique offline-first y
-            // dispare el TaskSyncWorker si hace falta.
-            taskRepository.createSubtasksBulk(taskId, titles)
-            hapticFeedbackManager.notification()
+            // Reemplaza las subtasks existentes (manuales o de una IA
+            // previa) en vez de append — cada vez que el usuario toca
+            // "Dividir con IA" arranca de cero.
+            taskRepository.replaceSubtasks(taskId, titles)
 
             notifyResult(
                 success = true,

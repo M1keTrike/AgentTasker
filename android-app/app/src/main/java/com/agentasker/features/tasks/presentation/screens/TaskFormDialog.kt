@@ -15,6 +15,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.outlined.Alarm
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material3.AlertDialog
@@ -22,6 +25,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -29,6 +33,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberTimePickerState
@@ -45,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.agentasker.R
 import com.agentasker.core.ui.components.PrioritySelector
+import com.agentasker.features.tasks.domain.entities.Subtask
 import com.agentasker.features.tasks.domain.entities.Task
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -61,16 +67,21 @@ fun TaskFormDialog(
     description: String,
     priority: String,
     reminderAt: Long? = null,
+    subtasks: List<Subtask> = emptyList(),
     onTitleChange: (String) -> Unit,
     onDescriptionChange: (String) -> Unit,
     onPriorityChange: (String) -> Unit,
     onReminderAtChange: (Long?) -> Unit = {},
+    onAddSubtask: (String) -> Unit = {},
+    onRenameSubtask: (subtaskId: String, newTitle: String) -> Unit = { _, _ -> },
+    onDeleteSubtask: (subtaskId: String) -> Unit = {},
     onDismiss: () -> Unit,
     onSave: (title: String, description: String, priority: String, reminderAt: Long?) -> Unit
 ) {
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
     var selectedDateMillis by remember { mutableStateOf<Long?>(null) }
+    var newSubtaskTitle by remember { mutableStateOf("") }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -124,6 +135,63 @@ fun TaskFormDialog(
                     onSetReminder = { showDatePicker = true },
                     onClearReminder = { onReminderAtChange(null) }
                 )
+
+                // Sección de subtasks: solo visible al editar una task
+                // existente (necesitamos un taskId para crear subtasks).
+                if (task != null) {
+                    HorizontalDivider()
+                    Text(
+                        text = "Subtareas",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    if (subtasks.isEmpty()) {
+                        Text(
+                            text = "Aún no hay subtareas. Agrégalas manualmente o usa 'Dividir con IA' desde la tarjeta.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            subtasks.forEach { subtask ->
+                                SubtaskEditRow(
+                                    subtask = subtask,
+                                    onRename = { onRenameSubtask(subtask.id, it) },
+                                    onDelete = { onDeleteSubtask(subtask.id) }
+                                )
+                            }
+                        }
+                    }
+                    // Fila para agregar una subtarea nueva.
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = newSubtaskTitle,
+                            onValueChange = { newSubtaskTitle = it },
+                            label = { Text("Nueva subtarea") },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        IconButton(
+                            onClick = {
+                                if (newSubtaskTitle.isNotBlank()) {
+                                    onAddSubtask(newSubtaskTitle)
+                                    newSubtaskTitle = ""
+                                }
+                            },
+                            enabled = newSubtaskTitle.isNotBlank()
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = "Agregar subtarea",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                }
             }
         },
         confirmButton = {
@@ -237,6 +305,58 @@ fun TaskFormDialog(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun SubtaskEditRow(
+    subtask: Subtask,
+    onRename: (String) -> Unit,
+    onDelete: () -> Unit
+) {
+    // Estado local con el texto: solo se persiste al perder el foco
+    // o al tocar el confirm del keyboard, para no spamear al repo con
+    // una llamada por cada tecla.
+    var editedTitle by remember(subtask.id, subtask.title) { mutableStateOf(subtask.title) }
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        OutlinedTextField(
+            value = editedTitle,
+            onValueChange = { editedTitle = it },
+            singleLine = true,
+            modifier = Modifier.weight(1f),
+            textStyle = MaterialTheme.typography.bodyMedium,
+            colors = TextFieldDefaults.colors(
+                focusedContainerColor = MaterialTheme.colorScheme.surface,
+                unfocusedContainerColor = MaterialTheme.colorScheme.surface
+            )
+        )
+        val isDirty = editedTitle.trim() != subtask.title && editedTitle.isNotBlank()
+        IconButton(
+            onClick = {
+                if (isDirty) onRename(editedTitle.trim())
+            },
+            enabled = isDirty
+        ) {
+            Icon(
+                imageVector = Icons.Default.Check,
+                contentDescription = "Guardar cambio",
+                modifier = Modifier.size(18.dp),
+                tint = if (isDirty) MaterialTheme.colorScheme.primary
+                else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+            )
+        }
+        IconButton(onClick = onDelete) {
+            Icon(
+                imageVector = Icons.Default.Delete,
+                contentDescription = "Eliminar subtarea",
+                tint = MaterialTheme.colorScheme.error,
+                modifier = Modifier.size(18.dp)
+            )
         }
     }
 }

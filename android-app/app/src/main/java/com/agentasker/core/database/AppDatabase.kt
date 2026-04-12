@@ -21,7 +21,7 @@ import com.agentasker.features.tasks.data.datasources.local.entities.TaskEntity
         TaskReminderEntity::class,
         KanbanColumnEntity::class
     ],
-    version = 8,
+    version = 9,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

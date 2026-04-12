@@ -18,17 +18,19 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.CameraAlt
 import androidx.compose.material.icons.outlined.PhotoLibrary
-import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -152,7 +154,7 @@ fun AnalyzerScreen(
                     Icon(
                         imageVector = Icons.Outlined.CameraAlt,
                         contentDescription = null,
-                        modifier = Modifier.width(18.dp)
+                        modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text("Tomar foto")
@@ -171,7 +173,7 @@ fun AnalyzerScreen(
                     Icon(
                         imageVector = Icons.Outlined.PhotoLibrary,
                         contentDescription = null,
-                        modifier = Modifier.width(18.dp)
+                        modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text("Galería")
@@ -209,7 +211,8 @@ fun AnalyzerScreen(
                             Icon(
                                 imageVector = Icons.Outlined.PhotoLibrary,
                                 contentDescription = null,
-                                modifier = Modifier.width(48.dp)
+                                modifier = Modifier.size(48.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Text(
                                 text = "Ninguna imagen seleccionada",
@@ -223,17 +226,34 @@ fun AnalyzerScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            Button(
+            // FilledTonalButton en vez de Button normal porque su estado
+            // disabled tiene mejor contraste en dark theme (el Button
+            // primario deshabilitado se veía como una barra clara casi
+            // invisible). Además forzamos container/content colors para
+            // que siempre se lea bien.
+            FilledTonalButton(
                 onClick = { viewModel.analyzeSelectedImage() },
                 enabled = uiState.selectedImageUri != null,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
+                colors = ButtonDefaults.filledTonalButtonColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             ) {
                 Icon(
                     imageVector = Icons.Outlined.AutoAwesome,
-                    contentDescription = null
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp)
                 )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Analizar con IA")
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    text = "Analizar con IA",
+                    style = MaterialTheme.typography.labelLarge
+                )
             }
 
             Text(

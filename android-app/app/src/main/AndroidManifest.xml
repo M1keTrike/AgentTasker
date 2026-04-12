@@ -116,6 +116,18 @@
             android:enabled="true"
             android:exported="false" />
 
+        <!-- Override del SystemForegroundService de WorkManager para declarar
+             foregroundServiceType="dataSync". Necesario porque los workers de
+             IA (AiSubtaskGenerationWorker, AiImageAnalysisWorker) llaman a
+             setForeground(ForegroundInfo(..., FOREGROUND_SERVICE_TYPE_DATA_SYNC)),
+             y Android 14+ exige que ese tipo esté declarado en el <service>
+             del manifest. Sin este merge, el proceso crashea con
+             "foregroundServiceType 0x00000001 is not a subset of 0x00000000". -->
+        <service
+            android:name="androidx.work.impl.foreground.SystemForegroundService"
+            android:foregroundServiceType="dataSync"
+            tools:node="merge" />
+
         <!-- FileProvider usado por el Analyzer para capturar fotos.
              La app de cámara necesita una Uri content:// escribible.
              Apunta al directorio de fotos privado de la app. -->

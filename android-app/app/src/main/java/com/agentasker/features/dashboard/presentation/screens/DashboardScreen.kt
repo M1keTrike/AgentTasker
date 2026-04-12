@@ -20,19 +20,24 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Assignment
+import androidx.compose.material.icons.filled.DeleteForever
+import androidx.compose.material.icons.outlined.Archive
 import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.CloudSync
 import androidx.compose.material.icons.outlined.Flag
 import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.Pending
+import androidx.compose.material.icons.outlined.Restore
 import androidx.compose.material.icons.outlined.School
 import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -40,10 +45,13 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -59,6 +67,7 @@ import com.agentasker.features.dashboard.presentation.viewmodel.ClassroomIntegra
 import com.agentasker.features.dashboard.presentation.viewmodel.DashboardUiState
 import com.agentasker.features.dashboard.presentation.viewmodel.DashboardViewModel
 import com.agentasker.features.dashboard.presentation.viewmodel.UpcomingItem
+import com.agentasker.features.tasks.domain.entities.Task
 import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -136,6 +145,12 @@ fun DashboardScreen(
                         authLauncher.launch(classroomViewModel.createAuthIntent())
                     },
                     onSyncClassroom = { classroomViewModel.syncNow() },
+                    onDeleteArchived = { taskId ->
+                        viewModel.deleteArchivedPermanently(taskId)
+                    },
+                    onRestoreArchived = { taskId ->
+                        viewModel.restoreArchived(taskId)
+                    },
                     modifier = Modifier.padding(innerPadding)
                 )
             }
@@ -151,6 +166,8 @@ private fun DashboardContent(
     onNavigateToClassroom: () -> Unit,
     onConnectClassroom: () -> Unit,
     onSyncClassroom: () -> Unit,
+    onDeleteArchived: (String) -> Unit,
+    onRestoreArchived: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
@@ -213,6 +230,16 @@ private fun DashboardContent(
                 onConnect = onConnectClassroom,
                 onSync = onSyncClassroom
             )
+        }
+
+        if (state.archivedTasks.isNotEmpty()) {
+            item {
+                ArchivedTasksCard(
+                    archivedTasks = state.archivedTasks,
+                    onRestore = onRestoreArchived,
+                    onDelete = onDeleteArchived
+                )
+            }
         }
 
         item {
@@ -336,6 +363,119 @@ private fun ClassroomIntegrationCard(
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun ArchivedTasksCard(
+    archivedTasks: List<Task>,
+    onRestore: (String) -> Unit,
+    onDelete: (String) -> Unit
+) {
+    var taskPendingDelete by remember { mutableStateOf<Task?>(null) }
+
+    DashboardCard(
+        title = "Archivadas (${archivedTasks.size})",
+        icon = Icons.Outlined.Archive,
+        iconTint = Color(0xFF6D4C41)
+    ) {
+        if (archivedTasks.isEmpty()) {
+            Text(
+                text = "Aún no has archivado ninguna tarea.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                archivedTasks.take(10).forEach { task ->
+                    ArchivedTaskRow(
+                        task = task,
+                        onRestore = { onRestore(task.id) },
+                        onRequestDelete = { taskPendingDelete = task }
+                    )
+                }
+                if (archivedTasks.size > 10) {
+                    Text(
+                        text = "+${archivedTasks.size - 10} más",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+    }
+
+    taskPendingDelete?.let { task ->
+        AlertDialog(
+            onDismissRequest = { taskPendingDelete = null },
+            title = { Text("Eliminar permanentemente") },
+            text = {
+                Text(
+                    "¿Eliminar \"${task.title}\" de forma definitiva? Esta acción no se puede deshacer."
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onDelete(task.id)
+                        taskPendingDelete = null
+                    }
+                ) {
+                    Text(
+                        "Eliminar",
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { taskPendingDelete = null }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun ArchivedTaskRow(
+    task: Task,
+    onRestore: () -> Unit,
+    onRequestDelete: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = task.title,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1
+            )
+            if (task.subtasks.isNotEmpty()) {
+                Text(
+                    text = "${task.subtasks.size} subtareas",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        IconButton(onClick = onRestore) {
+            Icon(
+                imageVector = Icons.Outlined.Restore,
+                contentDescription = "Restaurar",
+                modifier = Modifier.size(20.dp),
+                tint = MaterialTheme.colorScheme.primary
+            )
+        }
+        IconButton(onClick = onRequestDelete) {
+            Icon(
+                imageVector = Icons.Filled.DeleteForever,
+                contentDescription = "Eliminar permanentemente",
+                modifier = Modifier.size(20.dp),
+                tint = MaterialTheme.colorScheme.error
+            )
         }
     }
 }

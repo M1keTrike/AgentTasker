@@ -39,10 +39,20 @@ export class TasksService {
   }
 
   async findAll(userId: number): Promise<Task[]> {
+    // Por defecto solo devolvemos las tasks NO archivadas. Las archivadas
+    // se consultan explícitamente con findArchived() desde el Dashboard.
     return await this.taskRepository.find({
-      where: { userId },
+      where: { userId, isArchived: false },
       relations: ['subtasks'],
       order: { createdAt: 'DESC' },
+    });
+  }
+
+  async findArchived(userId: number): Promise<Task[]> {
+    return await this.taskRepository.find({
+      where: { userId, isArchived: true },
+      relations: ['subtasks'],
+      order: { updatedAt: 'DESC' },
     });
   }
 

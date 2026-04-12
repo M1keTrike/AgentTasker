@@ -25,6 +25,8 @@ data class TaskDTO(
     val courseName: String? = null,
     @SerializedName("externalLink")
     val externalLink: String? = null,
+    @SerializedName("isArchived")
+    val isArchived: Boolean? = null,
     @SerializedName("subtasks")
     val subtasks: List<SubtaskDTO>? = null,
     @SerializedName("createdAt")
@@ -64,7 +66,9 @@ data class UpdateTaskRequest(
     @SerializedName("status")
     val status: String? = null,
     @SerializedName("dueDate")
-    val dueDate: String? = null
+    val dueDate: String? = null,
+    @SerializedName("isArchived")
+    val isArchived: Boolean? = null
 )
 
 data class SubtaskDTO(

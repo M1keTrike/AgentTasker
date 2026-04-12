@@ -10,8 +10,11 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface TaskDao {
 
-    @Query("SELECT * FROM tasks WHERE pendingAction IS NULL OR pendingAction != 'delete' ORDER BY updatedAt DESC")
+    @Query("SELECT * FROM tasks WHERE isArchived = 0 AND (pendingAction IS NULL OR pendingAction != 'delete') ORDER BY updatedAt DESC")
     fun getAllTasks(): Flow<List<TaskEntity>>
+
+    @Query("SELECT * FROM tasks WHERE isArchived = 1 AND (pendingAction IS NULL OR pendingAction != 'delete') ORDER BY updatedAt DESC")
+    fun getArchivedTasks(): Flow<List<TaskEntity>>
 
     @Query("SELECT * FROM tasks WHERE id = :id")
     fun getTaskById(id: String): Flow<TaskEntity?>

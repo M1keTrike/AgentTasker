@@ -15,9 +15,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.CallSplit
 import androidx.compose.material.icons.filled.CheckBox
 import androidx.compose.material.icons.filled.CheckBoxOutlineBlank
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.outlined.School
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -43,6 +46,7 @@ fun TaskCard(
     onDelete: () -> Unit,
     onSplitWithAi: (() -> Unit)? = null,
     onToggleSubtask: ((Subtask) -> Unit)? = null,
+    onComplete: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val isClassroom = task.source == TaskSource.CLASSROOM
@@ -142,6 +146,29 @@ fun TaskCard(
                             onToggle = { onToggleSubtask?.invoke(subtask) }
                         )
                     }
+                }
+            }
+
+            // Cuando TODAS las subtasks están tachadas, aparece el botón
+            // verde "Completar y archivar". Solo para tasks locales —
+            // Classroom es read-only.
+            if (!isClassroom && task.allSubtasksCompleted && onComplete != null) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Button(
+                    onClick = onComplete,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF2E7D32),
+                        contentColor = Color.White
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.CheckCircle,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Completar y archivar")
                 }
             }
 

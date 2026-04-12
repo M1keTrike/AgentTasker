@@ -6,6 +6,8 @@ import kotlinx.coroutines.flow.Flow
 
 interface TaskRepository {
     fun observeTasks(): Flow<List<Task>>
+    /** Solo emite tasks archivadas. Se consume desde el Dashboard. */
+    fun observeArchivedTasks(): Flow<List<Task>>
     suspend fun refreshTasks()
     suspend fun getTasks(): List<Task>
     suspend fun getTaskById(id: String): Task
@@ -26,8 +28,14 @@ interface TaskRepository {
         description: String?,
         priority: String?,
         status: String? = null,
-        dueDate: String? = null
+        dueDate: String? = null,
+        isArchived: Boolean? = null
     ): Task
+    /**
+     * Marca la task como completada y archivada (atajo del botón
+     * "Completar" que aparece cuando todas las subtasks están tachadas).
+     */
+    suspend fun completeAndArchive(id: String): Task
     suspend fun deleteTask(id: String)
 
     // ---------- Subtasks ----------
@@ -38,6 +46,14 @@ interface TaskRepository {
     suspend fun createSubtask(taskId: String, title: String): Subtask
     suspend fun updateSubtask(subtaskId: String, title: String? = null, isCompleted: Boolean? = null): Subtask
     suspend fun deleteSubtask(subtaskId: String)
+
+    /**
+     * Borra todas las subtasks existentes de la task y las reemplaza por
+     * las nuevas. Usado por el flujo de IA: si el usuario ya tenía
+     * subtasks manuales y vuelve a tocar "Dividir con IA", las anteriores
+     * se sobreescriben. Devuelve las nuevas subtasks creadas.
+     */
+    suspend fun replaceSubtasks(taskId: String, titles: List<String>): List<Subtask>
 
     /**
      * Upsert de una task importada de Classroom: usa (userId, externalId) como

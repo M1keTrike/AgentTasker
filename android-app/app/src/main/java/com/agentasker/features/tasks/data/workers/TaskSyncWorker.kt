@@ -97,7 +97,8 @@ class TaskSyncWorker @AssistedInject constructor(
                             description = task.description,
                             priority = task.priority,
                             status = task.status,
-                            dueDate = task.dueDate
+                            dueDate = task.dueDate,
+                            isArchived = task.isArchived
                         )
                         val response = api.updateTask(task.id.toInt(), request)
                         val syncedEntity = response.toEntity(isSynced = true)

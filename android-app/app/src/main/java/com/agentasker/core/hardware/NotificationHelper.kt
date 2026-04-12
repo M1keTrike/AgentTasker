@@ -52,6 +52,11 @@ class NotificationHelper @Inject constructor(
 
             // Canal LOW para progreso de workers de IA — sin sonido ni
             // vibración para no molestar mientras corre en background.
+            // Android usa IMPORTANCE_LOW para NO hacer heads-up (HUN) y
+            // no impactar la reputación del remitente frente al sistema
+            // (que degrada apps que abusan de notificaciones intrusivas).
+            // Además deshabilitamos sonido, vibración y luces por si el
+            // usuario tiene alguna anulación a nivel de canal.
             val aiChannel = NotificationChannel(
                 AI_PROGRESS_CHANNEL,
                 "Procesos de IA",
@@ -59,6 +64,9 @@ class NotificationHelper @Inject constructor(
             ).apply {
                 description = "Progreso de análisis y generación de tareas con IA"
                 setShowBadge(false)
+                setSound(null, null)
+                enableVibration(false)
+                enableLights(false)
             }
             notificationManager.createNotificationChannel(aiChannel)
         }
@@ -84,11 +92,22 @@ class NotificationHelper @Inject constructor(
     /**
      * Muestra una notificación final (éxito o fallo) cuando un worker
      * de IA termina. Al tocarla abre la app con deep link a `screen`.
+     *
+     * Notas de reputación con el SO:
+     *  - Usa el canal AI_PROGRESS_CHANNEL (IMPORTANCE_LOW) que ya NO hace
+     *    heads-up, no suena y no vibra.
+     *  - Forzamos PRIORITY_LOW y setSilent(true) independientemente de si
+     *    es éxito o fallo. En Android, notificaciones no-intrusivas NO
+     *    degradan el "reputation score" del remitente. Usar PRIORITY_HIGH
+     *    para errores de IA sería categorizarlos como urgentes, lo cual
+     *    el sistema penaliza si el usuario las descarta sistemáticamente.
+     *  - setCategory(CATEGORY_STATUS) le dice al OS que es un status
+     *    update pasivo, no un alert.
      */
     fun showAiResultNotification(
         title: String,
         body: String,
-        success: Boolean,
+        @Suppress("UNUSED_PARAMETER") success: Boolean,
         screen: String = "tasks",
         taskId: String? = null
     ) {
@@ -107,10 +126,10 @@ class NotificationHelper @Inject constructor(
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title)
             .setContentText(body)
-            .setPriority(
-                if (success) NotificationCompat.PRIORITY_DEFAULT
-                else NotificationCompat.PRIORITY_HIGH
-            )
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setCategory(NotificationCompat.CATEGORY_STATUS)
+            .setSilent(true)
+            .setOnlyAlertOnce(true)
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
             .build()

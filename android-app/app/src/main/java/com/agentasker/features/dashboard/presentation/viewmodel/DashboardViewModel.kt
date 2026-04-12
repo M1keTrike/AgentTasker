@@ -7,11 +7,13 @@ import com.agentasker.features.classroom.domain.entities.ClassroomTask
 import com.agentasker.features.classroom.domain.entities.SubmissionState
 import com.agentasker.features.classroom.domain.usecases.GetClassroomTasksUseCase
 import com.agentasker.features.tasks.domain.entities.Task
+import com.agentasker.features.tasks.domain.repositories.TaskRepository
 import com.agentasker.features.tasks.domain.usecases.GetTasksUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import java.time.LocalDateTime
 import javax.inject.Inject
@@ -38,7 +40,8 @@ sealed interface DashboardUiState {
         val highPriorityCount: Int,
         val mediumPriorityCount: Int,
         val lowPriorityCount: Int,
-        val activeCourses: List<CourseInfo>
+        val activeCourses: List<CourseInfo>,
+        val archivedTasks: List<Task> = emptyList()
     ) : DashboardUiState
     data class Error(val message: String) : DashboardUiState
 }
@@ -46,7 +49,8 @@ sealed interface DashboardUiState {
 @HiltViewModel
 class DashboardViewModel @Inject constructor(
     private val getTasksUseCase: GetTasksUseCase,
-    private val getClassroomTasksUseCase: GetClassroomTasksUseCase
+    private val getClassroomTasksUseCase: GetClassroomTasksUseCase,
+    private val taskRepository: TaskRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<DashboardUiState>(DashboardUiState.Loading)
@@ -67,21 +71,61 @@ class DashboardViewModel @Inject constructor(
                 getTasksUseCase.refresh()
             } catch (_: Exception) { }
 
-            getTasksUseCase().collect { tasks ->
+            // Combinamos el flow de tasks activas con el de archivadas
+            // para que la sección "Archivados" del Dashboard se actualice
+            // en vivo cuando el usuario archive o restaure una task.
+            combine(
+                getTasksUseCase(),
+                taskRepository.observeArchivedTasks()
+            ) { tasks, archived ->
+                tasks to archived
+            }.collect { (tasks, archived) ->
                 val classroomTasks = try {
                     getClassroomTasksUseCase().getOrDefault(emptyList())
                 } catch (_: Exception) {
                     emptyList()
                 }
-                _uiState.value = buildSuccessState(tasks, classroomTasks)
+                _uiState.value = buildSuccessState(tasks, classroomTasks, archived)
             }
+        }
+    }
+
+    /**
+     * Elimina permanentemente una task archivada. No hay papelera — este
+     * es el borrado definitivo que el usuario pide desde el Dashboard.
+     */
+    fun deleteArchivedPermanently(taskId: String) {
+        viewModelScope.launch {
+            try {
+                taskRepository.deleteTask(taskId)
+            } catch (_: Exception) { }
+        }
+    }
+
+    /**
+     * Desarchiva una task — vuelve al tab Tareas.
+     */
+    fun restoreArchived(taskId: String) {
+        viewModelScope.launch {
+            try {
+                taskRepository.updateTask(
+                    id = taskId,
+                    title = null,
+                    description = null,
+                    priority = null,
+                    status = "pending",
+                    dueDate = null,
+                    isArchived = false
+                )
+            } catch (_: Exception) { }
         }
     }
 
     @SuppressLint("NewApi")
     private fun buildSuccessState(
         tasks: List<Task>,
-        classroomTasks: List<ClassroomTask>
+        classroomTasks: List<ClassroomTask>,
+        archivedTasks: List<Task>
     ): DashboardUiState.Success {
         val now = LocalDateTime.now()
         val threeDaysFromNow = now.plusDays(3)
@@ -131,13 +175,15 @@ class DashboardViewModel @Inject constructor(
 
         return DashboardUiState.Success(
             pendingCount = tasks.size + pendingClassroom.size,
-            completedCount = classroomTasks.count { it.submissionState == SubmissionState.TURNED_IN },
+            completedCount = archivedTasks.size +
+                classroomTasks.count { it.submissionState == SubmissionState.TURNED_IN },
             dueSoonCount = dueSoonCount,
             upcomingDeadlines = sortedUpcoming,
             highPriorityCount = tasks.count { it.priority.lowercase() == "high" },
             mediumPriorityCount = tasks.count { it.priority.lowercase() == "medium" },
             lowPriorityCount = tasks.count { it.priority.lowercase() == "low" },
-            activeCourses = activeCourses
+            activeCourses = activeCourses,
+            archivedTasks = archivedTasks
         )
     }
 }

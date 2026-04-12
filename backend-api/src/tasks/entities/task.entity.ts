@@ -80,6 +80,15 @@ export class Task {
   @Column({ type: 'varchar', nullable: true })
   externalLink: string | null;
 
+  /**
+   * Archivada por el usuario desde el botón "Completar" en el TaskCard
+   * cuando todas las subtasks están marcadas. Se oculta del listado
+   * principal y solo aparece en la sección "Archivados" del Dashboard.
+   * Si el usuario la borra desde ahí, se elimina físicamente.
+   */
+  @Column({ type: 'boolean', default: false })
+  isArchived: boolean;
+
   @Column({ nullable: true })
   userId: number;
 

@@ -24,7 +24,13 @@ data class Task(
     val externalId: String? = null,
     val courseName: String? = null,
     val externalLink: String? = null,
+    val isArchived: Boolean = false,
     val subtasks: List<Subtask> = emptyList(),
     val createdAt: String? = null,
     val updatedAt: String? = null
-)
+) {
+    /** True cuando hay subtasks y TODAS están completas — habilita el
+     * botón "Completar y archivar" en el TaskCard. */
+    val allSubtasksCompleted: Boolean
+        get() = subtasks.isNotEmpty() && subtasks.all { it.isCompleted }
+}
