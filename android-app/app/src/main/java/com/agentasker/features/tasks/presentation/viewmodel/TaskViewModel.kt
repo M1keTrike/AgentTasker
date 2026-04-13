@@ -4,8 +4,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.agentasker.core.hardware.HapticFeedbackManager
 import com.agentasker.core.hardware.ReminderScheduler
+import com.agentasker.features.tasks.data.workers.TaskSyncScheduler
+import com.agentasker.features.tasks.domain.entities.Subtask
 import com.agentasker.features.tasks.domain.entities.Task
 import com.agentasker.features.tasks.domain.repositories.TaskReminderRepository
+import com.agentasker.features.tasks.domain.repositories.TaskRepository
 import com.agentasker.features.tasks.domain.usecases.CreateTaskUseCase
 import com.agentasker.features.tasks.domain.usecases.DeleteTaskUseCase
 import com.agentasker.features.tasks.domain.usecases.GetTasksUseCase
@@ -18,7 +21,16 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
+import java.time.Instant
 import javax.inject.Inject
+
+private fun Long.toIsoString(): String = Instant.ofEpochMilli(this).toString()
+
+private fun String.toEpochMillisOrNull(): Long? = try {
+    Instant.parse(this).toEpochMilli()
+} catch (_: Exception) {
+    null
+}
 
 @HiltViewModel
 class TaskViewModel @Inject constructor(
@@ -28,7 +40,9 @@ class TaskViewModel @Inject constructor(
     private val deleteTaskUseCase: DeleteTaskUseCase,
     private val hapticFeedbackManager: HapticFeedbackManager,
     private val reminderScheduler: ReminderScheduler,
-    private val taskReminderRepository: TaskReminderRepository
+    private val taskReminderRepository: TaskReminderRepository,
+    private val taskRepository: TaskRepository,
+    private val taskSyncScheduler: TaskSyncScheduler
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(TaskUiState())
@@ -80,7 +94,9 @@ class TaskViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
 
-            createTaskUseCase(title, description, priority, status, dueDate).fold(
+            val effectiveDueDate = reminderAt?.toIsoString() ?: dueDate
+
+            createTaskUseCase(title, description, priority, status, effectiveDueDate).fold(
                 onSuccess = { task ->
                     if (reminderAt != null) {
                         taskReminderRepository.saveReminder(task.id, title, description, reminderAt)
@@ -106,7 +122,9 @@ class TaskViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
 
-            updateTaskUseCase(id, title, description, priority, status, dueDate).fold(
+            val effectiveDueDate = reminderAt?.toIsoString() ?: dueDate
+
+            updateTaskUseCase(id, title, description, priority, status, effectiveDueDate).fold(
                 onSuccess = {
                     hapticFeedbackManager.success()
                     taskReminderRepository.deleteReminder(id)
@@ -168,6 +186,8 @@ class TaskViewModel @Inject constructor(
     }
 
     fun showEditDialog(task: Task) {
+        val initialReminderFromDueDate = task.dueDate?.toEpochMillisOrNull()
+
         _uiState.value = _uiState.value.copy(
             showDialog = true,
             taskToEdit = task,
@@ -176,11 +196,13 @@ class TaskViewModel @Inject constructor(
             formPriority = task.priority,
             formStatus = task.status,
             formDueDate = task.dueDate,
-            formReminderAt = null
+            formReminderAt = initialReminderFromDueDate
         )
         viewModelScope.launch {
-            val reminderAt = taskReminderRepository.getReminderAt(task.id)
-            _uiState.value = _uiState.value.copy(formReminderAt = reminderAt)
+            val localReminder = taskReminderRepository.getReminderAt(task.id)
+            if (localReminder != null) {
+                _uiState.value = _uiState.value.copy(formReminderAt = localReminder)
+            }
         }
     }
 
@@ -219,5 +241,94 @@ class TaskViewModel @Inject constructor(
 
     fun updateFormReminderAt(reminderAt: Long?) {
         _uiState.value = _uiState.value.copy(formReminderAt = reminderAt)
+    }
+
+    fun splitWithAi(task: Task) {
+        if (task.description.isBlank()) {
+            _uiState.value = _uiState.value.copy(
+                error = "La tarea necesita una descripción para poder dividirla con IA."
+            )
+            return
+        }
+        taskSyncScheduler.scheduleAiSplit(task.id)
+        _uiState.value = _uiState.value.copy(
+            infoMessage = "Generando subtareas con IA… verás una notificación cuando termine."
+        )
+    }
+
+    fun toggleSubtask(subtask: Subtask) {
+        viewModelScope.launch {
+            try {
+                taskRepository.updateSubtask(
+                    subtaskId = subtask.id,
+                    isCompleted = !subtask.isCompleted
+                )
+                hapticFeedbackManager.success()
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    error = e.message ?: "Error al actualizar la subtarea"
+                )
+            }
+        }
+    }
+
+    fun completeAndArchive(taskId: String) {
+        viewModelScope.launch {
+            try {
+                taskRepository.completeAndArchive(taskId)
+                taskReminderRepository.deleteReminder(taskId)
+                reminderScheduler.cancelReminder(taskId)
+                hapticFeedbackManager.success()
+                _uiState.value = _uiState.value.copy(
+                    infoMessage = "Tarea completada y archivada."
+                )
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    error = e.message ?: "Error al completar la tarea"
+                )
+            }
+        }
+    }
+
+    fun addManualSubtask(taskId: String, title: String) {
+        if (title.isBlank()) return
+        viewModelScope.launch {
+            try {
+                taskRepository.createSubtask(taskId, title.trim())
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    error = e.message ?: "Error al agregar subtarea"
+                )
+            }
+        }
+    }
+
+    fun renameSubtask(subtaskId: String, newTitle: String) {
+        if (newTitle.isBlank()) return
+        viewModelScope.launch {
+            try {
+                taskRepository.updateSubtask(subtaskId = subtaskId, title = newTitle.trim())
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    error = e.message ?: "Error al renombrar subtarea"
+                )
+            }
+        }
+    }
+
+    fun deleteSubtask(subtaskId: String) {
+        viewModelScope.launch {
+            try {
+                taskRepository.deleteSubtask(subtaskId)
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    error = e.message ?: "Error al eliminar subtarea"
+                )
+            }
+        }
+    }
+
+    fun clearInfoMessage() {
+        _uiState.value = _uiState.value.copy(infoMessage = null)
     }
 }

@@ -16,3 +16,6 @@ data object ClassroomRoute
 
 @Serializable
 data object KanbanRoute
+
+@Serializable
+data object AnalyzerRoute

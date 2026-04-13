@@ -12,11 +12,15 @@ class ReminderBroadcastReceiver : BroadcastReceiver() {
     @Inject
     lateinit var notificationHelper: NotificationHelper
 
+    @Inject
+    lateinit var hapticFeedbackManager: HapticFeedbackManager
+
     override fun onReceive(context: Context, intent: Intent) {
         val taskId = intent.getStringExtra(EXTRA_TASK_ID) ?: return
         val title = intent.getStringExtra(EXTRA_TITLE) ?: "Recordatorio"
         val body = intent.getStringExtra(EXTRA_BODY) ?: "Tienes una tarea pendiente"
 
+        hapticFeedbackManager.notification()
         notificationHelper.showTaskReminder(taskId, title, body)
     }
 

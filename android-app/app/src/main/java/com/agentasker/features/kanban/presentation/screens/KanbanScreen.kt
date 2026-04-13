@@ -1,18 +1,16 @@
 package com.agentasker.features.kanban.presentation.screens
 
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -21,15 +19,20 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.outlined.ViewColumn
 import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -38,15 +41,25 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -57,6 +70,13 @@ import com.agentasker.features.kanban.domain.entities.KanbanItem
 import com.agentasker.features.kanban.presentation.components.ColumnFormDialog
 import com.agentasker.features.kanban.presentation.components.KanbanItemCard
 import com.agentasker.features.kanban.presentation.viewmodel.KanbanViewModel
+import com.agentasker.features.tasks.presentation.service.TaskSyncService
+
+private class DragState {
+    var draggingItem: KanbanItem? by mutableStateOf(null)
+    var pointer: Offset by mutableStateOf(Offset.Zero)
+    var sourceStatus: String? by mutableStateOf(null)
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -65,6 +85,9 @@ fun KanbanScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+
+    val columnBounds = remember { mutableStateMapOf<String, Rect>() }
+    val dragState = remember { DragState() }
 
     LaunchedEffect(uiState.error) {
         uiState.error?.let { error ->
@@ -91,7 +114,41 @@ fun KanbanScreen(
         modifier = Modifier.fillMaxSize(),
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("Tablero Kanban", fontWeight = FontWeight.ExtraBold) }
+                title = { Text("Tablero Kanban", fontWeight = FontWeight.ExtraBold) },
+                actions = {
+                    IconButton(
+                        onClick = { viewModel.startTaskSyncService() },
+                        enabled = uiState.syncState !is TaskSyncService.SyncState.Running
+                    ) {
+                        when (uiState.syncState) {
+                            is TaskSyncService.SyncState.Running -> {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.padding(6.dp),
+                                    strokeWidth = 2.dp
+                                )
+                            }
+                            is TaskSyncService.SyncState.Error -> {
+                                Icon(
+                                    imageVector = Icons.Default.CloudOff,
+                                    contentDescription = "Error de sincronización",
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                            }
+                            is TaskSyncService.SyncState.Success -> {
+                                Icon(
+                                    imageVector = Icons.Default.CloudDone,
+                                    contentDescription = "Sincronización completada"
+                                )
+                            }
+                            TaskSyncService.SyncState.Idle -> {
+                                Icon(
+                                    imageVector = Icons.Default.CloudSync,
+                                    contentDescription = "Sincronizar tareas"
+                                )
+                            }
+                        }
+                    }
+                }
             )
         },
         floatingActionButton = {
@@ -131,31 +188,86 @@ fun KanbanScreen(
                             items = uiState.columns,
                             key = { it.id }
                         ) { column ->
+                            val isHoverTarget = dragState.draggingItem != null &&
+                                dragState.sourceStatus != column.statusKey &&
+                                columnBounds[column.statusKey]?.contains(dragState.pointer) == true
+
                             KanbanColumnView(
                                 column = column,
                                 items = uiState.tasksByStatus[column.statusKey] ?: emptyList(),
+                                isHoverTarget = isHoverTarget,
+                                onBoundsChanged = { rect ->
+                                    columnBounds[column.statusKey] = rect
+                                },
                                 onEditColumn = { viewModel.showEditColumnDialog(column) },
                                 onDeleteColumn = { viewModel.deleteColumn(column.id) },
-                                allColumns = uiState.columns,
-                                onMoveTask = { item, newStatus -> viewModel.moveTask(item, newStatus) }
+                                onStartDrag = { item, pointer ->
+                                    dragState.draggingItem = item
+                                    dragState.sourceStatus = column.statusKey
+                                    dragState.pointer = pointer
+                                },
+                                onDragMove = { pointer ->
+                                    dragState.pointer = pointer
+                                },
+                                onDragEnd = {
+                                    val dragged = dragState.draggingItem
+                                    val target = columnBounds.entries
+                                        .firstOrNull { (_, rect) -> rect.contains(dragState.pointer) }
+                                        ?.key
+                                    if (dragged is KanbanItem.TaskItem &&
+                                        target != null &&
+                                        target != dragState.sourceStatus
+                                    ) {
+                                        viewModel.moveTask(dragged, target)
+                                    }
+                                    dragState.draggingItem = null
+                                    dragState.sourceStatus = null
+                                    dragState.pointer = Offset.Zero
+                                }
                             )
                         }
                     }
+                }
+            }
+
+            val dragging = dragState.draggingItem
+            if (dragging != null) {
+                val density = LocalDensity.current
+                val ghostWidthPx = with(density) { 240.dp.toPx() }
+                val ghostHeightPx = with(density) { 80.dp.toPx() }
+                Box(
+                    modifier = Modifier
+                        .offset {
+                            IntOffset(
+                                x = (dragState.pointer.x - ghostWidthPx / 2).toInt(),
+                                y = (dragState.pointer.y - ghostHeightPx / 2).toInt()
+                            )
+                        }
+                        .width(240.dp)
+                        .graphicsLayer {
+                            alpha = 0.85f
+                            scaleX = 1.02f
+                            scaleY = 1.02f
+                        }
+                ) {
+                    KanbanItemCard(item = dragging)
                 }
             }
         }
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun KanbanColumnView(
     column: KanbanColumn,
     items: List<KanbanItem>,
+    isHoverTarget: Boolean,
+    onBoundsChanged: (Rect) -> Unit,
     onEditColumn: () -> Unit,
     onDeleteColumn: () -> Unit,
-    allColumns: List<KanbanColumn>,
-    onMoveTask: (KanbanItem, String) -> Unit
+    onStartDrag: (KanbanItem, Offset) -> Unit,
+    onDragMove: (Offset) -> Unit,
+    onDragEnd: () -> Unit
 ) {
     var showMenu by remember { mutableStateOf(false) }
 
@@ -164,20 +276,25 @@ private fun KanbanColumnView(
         catch (_: Exception) { MaterialTheme.colorScheme.primaryContainer }
     } ?: MaterialTheme.colorScheme.primaryContainer
 
+    val containerColor = if (isHoverTarget) {
+        columnColor.copy(alpha = 0.25f)
+    } else {
+        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+    }
+
     Column(
         modifier = Modifier
             .width(280.dp)
             .fillMaxHeight()
             .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+            .background(containerColor)
+            .onGloballyPositioned { layoutCoords ->
+                onBoundsChanged(layoutCoords.boundsInRoot())
+            }
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .combinedClickable(
-                    onClick = {},
-                    onLongClick = { showMenu = true }
-                )
                 .background(columnColor.copy(alpha = 0.7f))
                 .padding(12.dp)
         ) {
@@ -190,13 +307,24 @@ private fun KanbanColumnView(
                     text = column.title,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.weight(1f)
                 )
                 Text(
                     text = "${items.size}",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
                 )
+                IconButton(
+                    onClick = { showMenu = true },
+                    modifier = Modifier.padding(start = 4.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = "Acciones de columna",
+                        modifier = Modifier.padding(0.dp)
+                    )
+                }
             }
 
             DropdownMenu(
@@ -234,9 +362,10 @@ private fun KanbanColumnView(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "Sin tareas",
+                    text = if (isHoverTarget) "Soltar aquí" else "Sin tareas",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = if (isHoverTarget) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center
                 )
             }
@@ -251,41 +380,27 @@ private fun KanbanColumnView(
                     items = items,
                     key = { "${it.type}_${it.id}" }
                 ) { item ->
-                    var showMoveMenu by remember { mutableStateOf(false) }
+                    var itemOrigin by remember { mutableStateOf(Offset.Zero) }
 
-                    Box {
-                        KanbanItemCard(
-                            item = item,
-                            modifier = Modifier.combinedClickable(
-                                onClick = {},
-                                onLongClick = {
-                                    if (item is KanbanItem.TaskItem) {
-                                        showMoveMenu = true
-                                    }
-                                }
-                            )
-                        )
-
-                        DropdownMenu(
-                            expanded = showMoveMenu,
-                            onDismissRequest = { showMoveMenu = false }
-                        ) {
-                            Text(
-                                text = "Mover a:",
-                                style = MaterialTheme.typography.labelMedium,
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-                                fontWeight = FontWeight.Bold
-                            )
-                            allColumns.filter { it.statusKey != column.statusKey }.forEach { targetColumn ->
-                                DropdownMenuItem(
-                                    text = { Text(targetColumn.title) },
-                                    onClick = {
-                                        showMoveMenu = false
-                                        onMoveTask(item, targetColumn.statusKey)
-                                    }
+                    Box(
+                        modifier = Modifier
+                            .onGloballyPositioned { itemOrigin = it.positionInRoot() }
+                            .pointerInput(item.id) {
+                                detectDragGesturesAfterLongPress(
+                                    onDragStart = { offset ->
+                                        if (item is KanbanItem.TaskItem) {
+                                            onStartDrag(item, itemOrigin + offset)
+                                        }
+                                    },
+                                    onDrag = { change, _ ->
+                                        onDragMove(itemOrigin + change.position)
+                                    },
+                                    onDragEnd = { onDragEnd() },
+                                    onDragCancel = { onDragEnd() }
                                 )
                             }
-                        }
+                    ) {
+                        KanbanItemCard(item = item)
                     }
                 }
             }

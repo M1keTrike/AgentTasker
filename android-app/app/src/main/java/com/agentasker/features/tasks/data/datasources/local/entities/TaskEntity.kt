@@ -12,8 +12,13 @@ data class TaskEntity(
     val priority: String,
     val status: String = "pending",
     val dueDate: String? = null,
+    val source: String = "local",
+    val externalId: String? = null,
+    val courseName: String? = null,
+    val externalLink: String? = null,
+    val isArchived: Boolean = false,
     val createdAt: String? = null,
     val updatedAt: String? = null,
     val isSynced: Boolean = true,
-    val pendingAction: String? = null // "create", "update", "delete", or null (synced)
+    val pendingAction: String? = null
 )

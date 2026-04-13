@@ -1,8 +1,8 @@
 package com.agentasker.features.kanban.presentation.viewmodel
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.agentasker.features.classroom.domain.repositories.ClassroomRepository
 import com.agentasker.features.kanban.domain.entities.KanbanColumn
 import com.agentasker.features.kanban.domain.entities.KanbanItem
 import com.agentasker.features.kanban.domain.usecases.CreateKanbanColumnUseCase
@@ -12,7 +12,9 @@ import com.agentasker.features.kanban.domain.usecases.UpdateKanbanColumnUseCase
 import com.agentasker.features.kanban.domain.repositories.KanbanRepository
 import com.agentasker.features.kanban.presentation.screens.KanbanUiState
 import com.agentasker.features.tasks.domain.repositories.TaskRepository
+import com.agentasker.features.tasks.presentation.service.TaskSyncServiceConnection
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -29,15 +31,32 @@ class KanbanViewModel @Inject constructor(
     private val deleteColumnUseCase: DeleteKanbanColumnUseCase,
     private val kanbanRepository: KanbanRepository,
     private val taskRepository: TaskRepository,
-    private val classroomRepository: ClassroomRepository
+    @ApplicationContext private val appContext: Context
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(KanbanUiState())
     val uiState: StateFlow<KanbanUiState> = _uiState.asStateFlow()
 
+    private val syncConnection = TaskSyncServiceConnection(appContext)
+
     init {
         observeKanbanData()
         refreshData()
+        bindSyncService()
+    }
+
+    private fun bindSyncService() {
+        syncConnection.bind()
+        viewModelScope.launch {
+            syncConnection.syncState.collect { state ->
+                _uiState.value = _uiState.value.copy(syncState = state)
+            }
+        }
+    }
+
+    override fun onCleared() {
+        syncConnection.unbind()
+        super.onCleared()
     }
 
     private fun observeKanbanData() {
@@ -65,23 +84,6 @@ class KanbanViewModel @Inject constructor(
                     )
                 }
         }
-
-        loadClassroomTasks()
-    }
-
-    private fun loadClassroomTasks() {
-        viewModelScope.launch {
-            classroomRepository.getAllTasks().onSuccess { classroomTasks ->
-                val classroomItems = classroomTasks.map { KanbanItem.ClassroomItem(it) }
-                val currentMap = _uiState.value.tasksByStatus.toMutableMap()
-                for (item in classroomItems) {
-                    val list = currentMap.getOrDefault(item.status, emptyList()).toMutableList()
-                    list.add(item)
-                    currentMap[item.status] = list
-                }
-                _uiState.value = _uiState.value.copy(tasksByStatus = currentMap)
-            }
-        }
     }
 
     private fun refreshData() {
@@ -97,7 +99,6 @@ class KanbanViewModel @Inject constructor(
 
     fun refresh() {
         refreshData()
-        loadClassroomTasks()
     }
 
     fun showCreateColumnDialog() {
@@ -206,5 +207,9 @@ class KanbanViewModel @Inject constructor(
 
     fun clearError() {
         _uiState.value = _uiState.value.copy(error = null)
+    }
+
+    fun startTaskSyncService() {
+        syncConnection.triggerSync()
     }
 }

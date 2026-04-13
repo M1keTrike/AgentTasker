@@ -107,6 +107,18 @@ export class UsersService {
     await this.userRepository.update(userId, { refreshToken: null });
   }
 
+  async updateFcmToken(
+    userId: number,
+    fcmToken: string,
+  ): Promise<{ message: string }> {
+    await this.userRepository.update(userId, { fcmToken });
+    return { message: 'FCM token updated successfully' };
+  }
+
+  async clearFcmToken(userId: number): Promise<void> {
+    await this.userRepository.update(userId, { fcmToken: null });
+  }
+
   async findById(id: number): Promise<User | null> {
     return this.userRepository.findOne({ where: { id } });
   }

@@ -58,3 +58,8 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 # Database
 *.sqlite
 *.db
+
+# Firebase service account credentials (NEVER commit these)
+fcm-service-account.json
+*-service-account.json
+firebase-adminsdk-*.json

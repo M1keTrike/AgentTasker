@@ -11,6 +11,7 @@ import {
 import { UsersService } from './users.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { UpdateFcmTokenDto } from './dto/update-fcm-token.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
 @Controller('users')
@@ -37,5 +38,12 @@ export class UsersController {
       username: req.user.username,
       email: req.user.email,
     };
+  }
+
+  @Post('fcm-token')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  updateFcmToken(@Request() req, @Body() dto: UpdateFcmTokenDto) {
+    return this.usersService.updateFcmToken(req.user.id, dto.fcmToken);
   }
 }

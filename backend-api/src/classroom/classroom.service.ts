@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { OAuth2Client } from 'google-auth-library';
 import { GoogleTokenService } from './services/google-token.service';
@@ -7,9 +7,26 @@ import { ClassroomTaskDto } from './dto/classroom-task.dto';
 
 const CLASSROOM_API = 'https://classroom.googleapis.com/v1';
 
+const CACHE_TTL_MS = 5 * 60 * 1000;
+
+interface CacheEntry<T> {
+  data: T;
+  timestamp: number;
+}
+
 @Injectable()
 export class ClassroomService {
+  private readonly logger = new Logger(ClassroomService.name);
   private readonly oauth2Client: OAuth2Client;
+
+  private readonly coursesCache = new Map<
+    number,
+    CacheEntry<ClassroomCourseDto[]>
+  >();
+  private readonly allTasksCache = new Map<
+    number,
+    CacheEntry<ClassroomTaskDto[]>
+  >();
 
   constructor(
     private readonly googleTokenService: GoogleTokenService,
@@ -19,6 +36,11 @@ export class ClassroomService {
       this.configService.get<string>('GOOGLE_CLIENT_ID'),
       this.configService.get<string>('GOOGLE_CLIENT_SECRET'),
     );
+  }
+
+  private isCacheValid<T>(entry: CacheEntry<T> | undefined): boolean {
+    if (!entry) return false;
+    return Date.now() - entry.timestamp < CACHE_TTL_MS;
   }
 
   private async authenticatedRequest<T>(
@@ -54,6 +76,14 @@ export class ClassroomService {
   }
 
   async getCourses(userId: number): Promise<ClassroomCourseDto[]> {
+    const cached = this.coursesCache.get(userId);
+    if (this.isCacheValid(cached)) {
+      this.logger.debug(
+        `getCourses(${userId}) — cache hit (${cached!.data.length} courses)`,
+      );
+      return cached!.data;
+    }
+
     const data = await this.authenticatedRequest<{
       courses?: Array<{
         id: string;
@@ -68,7 +98,7 @@ export class ClassroomService {
       studentId: 'me',
     });
 
-    return (
+    const courses =
       data.courses?.map((c) => ({
         id: c.id,
         name: c.name,
@@ -76,8 +106,13 @@ export class ClassroomService {
         descriptionHeading: c.descriptionHeading,
         courseState: c.courseState,
         alternateLink: c.alternateLink,
-      })) ?? []
+      })) ?? [];
+
+    this.coursesCache.set(userId, { data: courses, timestamp: Date.now() });
+    this.logger.log(
+      `getCourses(${userId}) — fetched ${courses.length} courses from Google`,
     );
+    return courses;
   }
 
   async getTasksByCourse(
@@ -114,7 +149,7 @@ export class ClassroomService {
         if (submData.studentSubmissions?.length) {
           submissionState = submData.studentSubmissions[0].state;
         }
-      } catch { }
+      } catch {}
 
       let dueDate: string | undefined;
       if (cw.dueDate) {
@@ -141,15 +176,38 @@ export class ClassroomService {
   }
 
   async getAllTasks(userId: number): Promise<ClassroomTaskDto[]> {
+    const cached = this.allTasksCache.get(userId);
+    if (this.isCacheValid(cached)) {
+      this.logger.debug(
+        `getAllTasks(${userId}) — cache hit (${cached!.data.length} tasks)`,
+      );
+      return cached!.data;
+    }
+
     const courses = await this.getCourses(userId);
-    const allTasks = await Promise.all(
-      courses.map((c) => this.getTasksByCourse(userId, c.id, c.name)),
+    const allTasks = (
+      await Promise.all(
+        courses.map((c) => this.getTasksByCourse(userId, c.id, c.name)),
+      )
+    )
+      .flat()
+      .sort((a, b) => {
+        if (!a.dueDate && !b.dueDate) return 0;
+        if (!a.dueDate) return 1;
+        if (!b.dueDate) return -1;
+        return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+      });
+
+    this.allTasksCache.set(userId, { data: allTasks, timestamp: Date.now() });
+    this.logger.log(
+      `getAllTasks(${userId}) — fetched ${allTasks.length} tasks from Google (${courses.length} courses)`,
     );
-    return allTasks.flat().sort((a, b) => {
-      if (!a.dueDate && !b.dueDate) return 0;
-      if (!a.dueDate) return 1;
-      if (!b.dueDate) return -1;
-      return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
-    });
+    return allTasks;
+  }
+
+  invalidateCache(userId: number): void {
+    this.coursesCache.delete(userId);
+    this.allTasksCache.delete(userId);
+    this.logger.debug(`Cache invalidated for userId=${userId}`);
   }
 }

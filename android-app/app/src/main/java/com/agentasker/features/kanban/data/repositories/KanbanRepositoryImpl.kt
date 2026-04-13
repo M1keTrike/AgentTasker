@@ -131,7 +131,6 @@ class KanbanRepositoryImpl @Inject constructor(
     }
 
     override suspend fun reorderColumns(columns: List<Pair<String, Int>>) {
-        // Update local positions immediately
         for ((id, position) in columns) {
             val existing = columnDao.getColumnByIdSync(id) ?: continue
             columnDao.upsertColumn(existing.copy(position = position))
