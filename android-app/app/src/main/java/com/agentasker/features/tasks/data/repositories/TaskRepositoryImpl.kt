@@ -41,10 +41,6 @@ class TaskRepositoryImpl @Inject constructor(
     private suspend fun isOnline(): Boolean = networkMonitor.isOnline.first()
 
     override fun observeTasks(): Flow<List<Task>> {
-        // Combinamos tasks con TODAS las subtasks y juntamos en memoria.
-        // Así el Flow re-emite cuando cambia cualquiera de las dos tablas,
-        // y los toggles de subtasks se reflejan inmediatamente en la UI.
-        // Si el número crece mucho, migrar a @Transaction + @Relation.
         return combine(
             taskDao.getAllTasks(),
             subtaskDao.observeAll()
@@ -79,7 +75,6 @@ class TaskRepositoryImpl @Inject constructor(
         try {
             val remoteTasks = api.getTasks()
             taskDao.upsertTasks(remoteTasks.toEntities(isSynced = true))
-            // Sincronizamos subtasks embebidas en la respuesta.
             remoteTasks.forEach { dto ->
                 dto.subtasks?.let { subs ->
                     val entities = subs.map { sub ->
@@ -268,8 +263,6 @@ class TaskRepositoryImpl @Inject constructor(
         }
     }
 
-    // ---------- Subtasks ----------
-
     override fun observeSubtasks(taskId: String): Flow<List<Subtask>> {
         return subtaskDao.observeByTaskId(taskId).map { it.subtasksToDomain() }
     }
@@ -325,7 +318,6 @@ class TaskRepositoryImpl @Inject constructor(
             }
         }
 
-        // Offline / task local: creamos filas locales con pendingAction="create".
         val existingCount = subtaskDao.countByTaskId(taskId)
         val now = System.currentTimeMillis()
         val entities = titles.mapIndexed { idx, title ->
@@ -405,39 +397,23 @@ class TaskRepositoryImpl @Inject constructor(
     }
 
     override suspend fun replaceSubtasks(taskId: String, titles: List<String>): List<Subtask> {
-        // Fase 1: borrar las existentes. Iteramos una a una para respetar el
-        // flujo offline-first (cada deleteSubtask maneja online/pending).
         val existing = subtaskDao.getByTaskId(taskId)
         existing.forEach { sub ->
             try { deleteSubtask(sub.id) } catch (e: Exception) {
                 Log.w(TAG, "replaceSubtasks: fallo borrando sub ${sub.id}: ${e.message}")
             }
         }
-        // Fase 2: crear las nuevas (ya limpia la lista).
         return createSubtasksBulk(taskId, titles)
     }
 
-    // ---------- Classroom import ----------
-
     override suspend fun upsertImportedTask(task: Task): Task {
-        // Buscamos por externalId usando una query directa que NO filtra
-        // por isArchived — si ya existe (incluso archivada), queremos
-        // preservar los flags locales en vez de re-importarla como nueva.
         val existing = task.externalId?.let { taskDao.findByExternalId(it) }
 
-        // Si el usuario borró manualmente la Classroom task (quedó con
-        // pendingAction="delete"), respetamos esa decisión y no la
-        // re-importamos. Caso contrario sería confuso: el usuario la
-        // borra, toca sync, y la task reaparece como zombie.
         if (existing?.pendingAction == "delete") {
             return existing.toDomain()
         }
 
         val entity = if (existing != null) {
-            // Ya existe en Room. Actualizamos campos "de Classroom" pero
-            // preservamos los flags locales (isArchived, status, sync flags).
-            // Si ya tiene un id numérico (fue creada en el backend), la
-            // marcamos como "update" pendiente; si no, sigue como estaba.
             val needsSync = existing.id.toIntOrNull() != null
             task.toEntity(
                 isSynced = if (needsSync) false else existing.isSynced,
@@ -448,16 +424,10 @@ class TaskRepositoryImpl @Inject constructor(
                 status = if (existing.status == "pending") task.status else existing.status
             )
         } else {
-            // NUEVA: no existía en Room. La marcamos como pendiente de
-            // crear en el backend para que el TaskSyncWorker la suba y
-            // el cron de reminders pueda actuar sobre ella. Sin esto las
-            // Classroom tasks vivían solo en Room y nunca aparecían en
-            // Postgres → los reminders y la UI web no las veían.
             task.toEntity(isSynced = false, pendingAction = "create")
         }
         taskDao.upsertTask(entity)
 
-        // Si creamos o actualizamos con pendingAction, disparamos el sync.
         if (entity.pendingAction != null) {
             syncScheduler.scheduleSyncOnConnectivity()
         }

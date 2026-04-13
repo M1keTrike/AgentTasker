@@ -23,7 +23,6 @@ data class ClassroomIntegrationUiState(
     val lastSyncCount: Int? = null,
     val error: String? = null,
     val infoMessage: String? = null,
-    // Picker de cursos
     val courses: List<ClassroomCourse> = emptyList(),
     val selectedCourseIds: Set<String> = emptySet(),
     val showCoursePicker: Boolean = false,
@@ -55,7 +54,7 @@ class ClassroomIntegrationViewModel @Inject constructor(
                         loadCourses()
                     }
                 },
-                onFailure = { /* si falla, dejamos el estado como estaba */ }
+                onFailure = { }
             )
         }
     }
@@ -108,8 +107,6 @@ class ClassroomIntegrationViewModel @Inject constructor(
         }
     }
 
-    // ---------- Picker de cursos ----------
-
     fun loadCourses() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoadingCourses = true)
@@ -118,7 +115,6 @@ class ClassroomIntegrationViewModel @Inject constructor(
                     _uiState.value = _uiState.value.copy(
                         isLoadingCourses = false,
                         courses = courses,
-                        // Pre-seleccionar todos por defecto
                         selectedCourseIds = if (_uiState.value.selectedCourseIds.isEmpty())
                             courses.map { it.id }.toSet()
                         else
@@ -161,10 +157,6 @@ class ClassroomIntegrationViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(selectedCourseIds = emptySet())
     }
 
-    /**
-     * Sincroniza solo los cursos seleccionados en el picker.
-     * Cierra el picker y muestra snackbar con resultado.
-     */
     fun syncSelectedCourses() {
         val ids = _uiState.value.selectedCourseIds.toList()
         if (ids.isEmpty()) return

@@ -72,11 +72,6 @@ import com.agentasker.features.kanban.presentation.components.KanbanItemCard
 import com.agentasker.features.kanban.presentation.viewmodel.KanbanViewModel
 import com.agentasker.features.tasks.presentation.service.TaskSyncService
 
-/**
- * Estado global del drag. Se mantiene fuera del UiState del VM porque es
- * puramente visual (offset del dedo) y re-emitirlo a 60fps vía Flow sería
- * un desperdicio.
- */
 private class DragState {
     var draggingItem: KanbanItem? by mutableStateOf(null)
     var pointer: Offset by mutableStateOf(Offset.Zero)
@@ -91,7 +86,6 @@ fun KanbanScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    // Bounds de cada columna en coordenadas de root para resolver el drop.
     val columnBounds = remember { mutableStateMapOf<String, Rect>() }
     val dragState = remember { DragState() }
 
@@ -236,7 +230,6 @@ fun KanbanScreen(
                 }
             }
 
-            // Ghost card que sigue al dedo mientras se arrastra.
             val dragging = dragState.draggingItem
             if (dragging != null) {
                 val density = LocalDensity.current
@@ -393,9 +386,6 @@ private fun KanbanColumnView(
                         modifier = Modifier
                             .onGloballyPositioned { itemOrigin = it.positionInRoot() }
                             .pointerInput(item.id) {
-                                // detectDragGesturesAfterLongPress entrega `change`
-                                // con position LOCAL al pointerInput. Lo convertimos
-                                // a coord root sumando el origen del item.
                                 detectDragGesturesAfterLongPress(
                                     onDragStart = { offset ->
                                         if (item is KanbanItem.TaskItem) {

@@ -70,8 +70,6 @@ fun AnalyzerScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    // Uri temporal donde la cámara escribe. Se genera al tocar "Tomar foto"
-    // y se pasa tanto al launcher de cámara como a los listeners de resultado.
     var pendingCameraUri by remember { mutableStateOf<Uri?>(null) }
 
     val galleryLauncher = rememberLauncherForActivityResult(
@@ -120,10 +118,6 @@ fun AnalyzerScreen(
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { innerPadding ->
-        // verticalScroll obligatorio: el Card de preview + botones +
-        // texto de ayuda desborda en pantallas chicas, y sin scroll el
-        // botón "Analizar con IA" quedaba clipeado a ~8dp (el bug que
-        // viste como "barra rosa").
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -190,9 +184,6 @@ fun AnalyzerScreen(
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    // 16:10 en vez de 4:3 para dejar espacio al botón
-                    // de análisis sin necesidad de scroll en pantallas
-                    // medianas. El scroll sigue habilitado por si acaso.
                     .aspectRatio(16f / 10f),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surfaceVariant
@@ -236,11 +227,6 @@ fun AnalyzerScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // FilledTonalButton en vez de Button normal porque su estado
-            // disabled tiene mejor contraste en dark theme (el Button
-            // primario deshabilitado se veía como una barra clara casi
-            // invisible). Además forzamos container/content colors para
-            // que siempre se lea bien.
             FilledTonalButton(
                 onClick = { viewModel.analyzeSelectedImage() },
                 enabled = uiState.selectedImageUri != null,
@@ -275,11 +261,6 @@ fun AnalyzerScreen(
     }
 }
 
-/**
- * Crea un Uri content:// gestionado por FileProvider para que la app de
- * cámara pueda escribirle la foto. Usamos el directorio de fotos privado
- * de la app (no requiere WRITE_EXTERNAL_STORAGE).
- */
 private fun createImageUri(context: Context): Uri {
     val imagesDir = File(
         context.getExternalFilesDir(Environment.DIRECTORY_PICTURES),

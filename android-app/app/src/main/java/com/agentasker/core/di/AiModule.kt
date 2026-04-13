@@ -16,11 +16,6 @@ import java.util.concurrent.TimeUnit
 import javax.inject.Named
 import javax.inject.Singleton
 
-/**
- * DI para el cliente DeepSeek. Se mantiene aparte de `NetworkModule` porque
- * la base URL y la autenticación son distintas (Bearer con una API key
- * estática vs. los JWT del backend de AgentTasker).
- */
 @Module
 @InstallIn(SingletonComponent::class)
 object AiModule {
@@ -36,8 +31,6 @@ object AiModule {
         authInterceptor: DeepSeekAuthInterceptor,
         loggingInterceptor: HttpLoggingInterceptor
     ): OkHttpClient {
-        // DeepSeek puede tardar en responder con prompts grandes. 90s
-        // para read/write cubre el p99 sin frustrar al usuario.
         return OkHttpClient.Builder()
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(90, TimeUnit.SECONDS)

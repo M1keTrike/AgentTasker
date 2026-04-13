@@ -1,10 +1,5 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-/**
- * Añade los campos necesarios para unificar tasks locales y de Classroom
- * en la misma tabla. `source` distingue el origen; `externalId` guarda el
- * courseWorkId de Classroom para idempotencia al re-sincronizar.
- */
 export class AddSourceColumnsToTasks1742500000000
   implements MigrationInterface
 {

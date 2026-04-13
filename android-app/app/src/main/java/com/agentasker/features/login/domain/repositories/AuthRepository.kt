@@ -16,15 +16,6 @@ interface AuthRepository {
     suspend fun clearAuthToken()
     suspend fun isUserLoggedIn(): Boolean
 
-    /**
-     * Emite `true` mientras haya un token válido almacenado y `false`
-     * en cuanto se borren (por logout explícito o por el
-     * [TokenAuthenticator] al fallar un refresh tras un 401).
-     *
-     * El [LoginViewModel] lo observa para forzar navegación a Login
-     * cuando la sesión muere por un rebuild del backend u otro motivo
-     * externo que invalide el JWT.
-     */
     fun observeIsLoggedIn(): Flow<Boolean>
 }
 

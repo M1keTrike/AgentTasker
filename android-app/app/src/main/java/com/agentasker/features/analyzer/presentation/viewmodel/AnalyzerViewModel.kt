@@ -28,12 +28,6 @@ class AnalyzerViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(selectedImageUri = uri, error = null)
     }
 
-    /**
-     * Encola el worker que hace OCR + DeepSeek y crea una nueva task con
-     * sus subtasks. El worker corre como foreground + expedited, por lo
-     * que el usuario puede cerrar la app y recibirá una notificación al
-     * terminar. La UI solo muestra un mensaje y libera el estado.
-     */
     fun analyzeSelectedImage() {
         val uri = _uiState.value.selectedImageUri ?: return
         taskSyncScheduler.scheduleImageAnalysis(uri)

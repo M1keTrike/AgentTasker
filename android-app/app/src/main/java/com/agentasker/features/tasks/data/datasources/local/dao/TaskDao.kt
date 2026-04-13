@@ -22,12 +22,6 @@ interface TaskDao {
     @Query("SELECT * FROM tasks WHERE id = :id LIMIT 1")
     suspend fun getTaskByIdSync(id: String): TaskEntity?
 
-    /**
-     * Busca una task por su externalId ignorando el filtro de archivadas.
-     * Usado por el sync de Classroom para idempotencia: si una task ya
-     * existe (incluso archivada), la reconocemos y preservamos los flags
-     * locales (isArchived, status) en vez de re-importarla como nueva.
-     */
     @Query("SELECT * FROM tasks WHERE externalId = :externalId LIMIT 1")
     suspend fun findByExternalId(externalId: String): TaskEntity?
 

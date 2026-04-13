@@ -82,10 +82,6 @@ fun DashboardScreen(
     val classroomState by classroomViewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    // OAuth launcher: abre la pantalla de consentimiento de Google y
-    // devuelve aquí el Intent con el authorization code. Con ese Intent
-    // el ViewModel hace el handshake con el backend y deja Classroom
-    // conectado.
     val authLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -103,14 +99,11 @@ fun DashboardScreen(
     LaunchedEffect(classroomState.infoMessage) {
         classroomState.infoMessage?.let {
             snackbarHostState.showSnackbar(it)
-            // Al sincronizar, recargar el dashboard para reflejar las nuevas
-            // tasks importadas en los contadores.
             viewModel.refresh()
             classroomViewModel.clearMessages()
         }
     }
 
-    // Picker de cursos — se abre cuando el usuario toca "Sincronizar Classroom"
     if (classroomState.showCoursePicker) {
         CoursePickerDialog(
             state = classroomState,
@@ -342,7 +335,6 @@ private fun ClassroomIntegrationCard(
                     Text("Conectar con Classroom")
                 }
             } else {
-                // Botón abre el picker de cursos en vez de sync directo
                 OutlinedButton(
                     onClick = onSync,
                     enabled = !state.isSyncing,
@@ -380,11 +372,6 @@ private fun ClassroomIntegrationCard(
     }
 }
 
-/**
- * Dialog que muestra los cursos del usuario con checkboxes para elegir
- * cuáles sincronizar. Se abre desde el botón "Sincronizar Classroom"
- * de la ClassroomIntegrationCard.
- */
 @Composable
 private fun CoursePickerDialog(
     state: ClassroomIntegrationUiState,
@@ -419,7 +406,6 @@ private fun CoursePickerDialog(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 } else {
-                    // Toggle all
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
@@ -441,7 +427,6 @@ private fun CoursePickerDialog(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    // Lista de cursos
                     state.courses.forEach { course ->
                         val isSelected = course.id in state.selectedCourseIds
                         Row(

@@ -5,11 +5,6 @@ import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { Task } from './entities/task.entity';
 
-/**
- * Convierte un Date, un string ISO o null/undefined a millis (epoch).
- * Robusto contra el hecho de que TypeORM devuelve `Date` al leer, pero
- * `class-validator` mantiene strings cuando el DTO entra con `@IsDateString`.
- */
 function toMillis(value: Date | string | null | undefined): number | null {
   if (value == null) return null;
   if (value instanceof Date) return value.getTime();
@@ -28,8 +23,6 @@ export class TasksService {
   ) {}
 
   async create(createTaskDto: CreateTaskDto, userId: number): Promise<Task> {
-    // Una tarea recién creada siempre arranca con reminderSent=false para
-    // que el cron pueda dispararla cuando llegue su dueDate.
     const task = this.taskRepository.create({
       ...createTaskDto,
       userId,
@@ -39,8 +32,6 @@ export class TasksService {
   }
 
   async findAll(userId: number): Promise<Task[]> {
-    // Por defecto solo devolvemos las tasks NO archivadas. Las archivadas
-    // se consultan explícitamente con findArchived() desde el Dashboard.
     return await this.taskRepository.find({
       where: { userId, isArchived: false },
       relations: ['subtasks'],
@@ -76,21 +67,10 @@ export class TasksService {
 
     Object.assign(task, updateTaskDto);
 
-    // Siempre re-armamos el reminder cuando el usuario edita la task. Si
-    // el dueDate ya venció y el cron ya disparó el push (reminderSent=true),
-    // un edit desde la app significa que el usuario quiere que el reminder
-    // pueda volver a funcionar — por ejemplo si actualiza la fecha o
-    // simplemente quiere re-recibir el aviso tras cambiar el contenido.
-    //
-    // Antes solo lo reseteábamos cuando `dueDate` cambiaba, lo que dejaba
-    // `reminderSent=true` en ediciones de título/descripción/prioridad.
-    // Eso causaba que el cron nunca volviera a considerar la task.
     if (task.dueDate != null) {
       task.reminderSent = false;
     }
 
-    // Asegurar tipo Date antes de save() — TypeORM puede aceptar el string,
-    // pero así evitamos sorpresas en futuras reads.
     if (typeof task.dueDate === 'string') {
       task.dueDate = new Date(task.dueDate);
     }

@@ -12,21 +12,12 @@ import javax.inject.Singleton
 
 private const val TAG = "AiTaskService"
 
-/**
- * Wrapper de alto nivel sobre DeepSeek. Encapsula el armado del prompt,
- * la llamada HTTP y el parseo del JSON devuelto. Los workers solo hablan
- * con este servicio y nunca tocan DeepSeekApi directamente.
- */
 @Singleton
 class AiTaskService @Inject constructor(
     private val api: DeepSeekApi,
     private val gson: Gson
 ) {
 
-    /**
-     * Dada una task, pide a DeepSeek una lista de subtareas. Devuelve la
-     * lista o lanza si el parseo falla (el worker decide si retry o fail).
-     */
     suspend fun splitIntoSubtasks(title: String, description: String): List<String> {
         val request = DeepSeekChatRequest(
             messages = listOf(
@@ -51,10 +42,6 @@ class AiTaskService @Inject constructor(
         }
     }
 
-    /**
-     * Dado texto extraído por OCR, pide a DeepSeek una task completa
-     * (título, descripción, prioridad, subtasks).
-     */
     suspend fun analyzeOcrToTask(ocrText: String): AiTaskDraft {
         val request = DeepSeekChatRequest(
             messages = listOf(

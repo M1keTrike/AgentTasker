@@ -106,7 +106,6 @@ fun ClassroomScreen(
                                 modifier = Modifier.fillMaxSize(),
                                 contentPadding = PaddingValues(bottom = 8.dp)
                             ) {
-                                // Course filter chips
                                 if (uiState.courses.isNotEmpty()) {
                                     item {
                                         LazyRow(

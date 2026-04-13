@@ -70,8 +70,6 @@ fun List<TaskEntity>.toDomain(): List<Task> = map { it.toDomain() }
 
 fun List<TaskDTO>.toEntities(isSynced: Boolean = true): List<TaskEntity> = map { it.toEntity(isSynced) }
 
-// ---------- Subtask mappers ----------
-
 fun SubtaskEntity.toDomain(): Subtask = Subtask(
     id = id,
     taskId = taskId,

@@ -1,13 +1,5 @@
 package com.agentasker.features.tasks.domain.entities
 
-/**
- * Origen de una task:
- *  - "local":     creada por el usuario en la app (flujo habitual).
- *  - "classroom": importada desde Google Classroom vía el sync del Dashboard.
- *
- * Se mantiene como String plano para no acoplar el DTO y permitir
- * que llegue cualquier valor del backend sin romper el parser.
- */
 object TaskSource {
     const val LOCAL = "local"
     const val CLASSROOM = "classroom"
@@ -29,8 +21,6 @@ data class Task(
     val createdAt: String? = null,
     val updatedAt: String? = null
 ) {
-    /** True cuando hay subtasks y TODAS están completas — habilita el
-     * botón "Completar y archivar" en el TaskCard. */
     val allSubtasksCompleted: Boolean
         get() = subtasks.isNotEmpty() && subtasks.all { it.isCompleted }
 }

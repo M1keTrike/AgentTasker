@@ -2,11 +2,6 @@ package com.agentasker.core.ai.model
 
 import com.google.gson.annotations.SerializedName
 
-/**
- * DTOs para la API de DeepSeek (compatible OpenAI chat/completions).
- * Documentación: https://api-docs.deepseek.com/
- */
-
 data class DeepSeekChatRequest(
     @SerializedName("model")
     val model: String = "deepseek-chat",
@@ -29,7 +24,7 @@ data class DeepSeekResponseFormat(
 
 data class DeepSeekMessage(
     @SerializedName("role")
-    val role: String, // "system" | "user" | "assistant"
+    val role: String,
     @SerializedName("content")
     val content: String
 )

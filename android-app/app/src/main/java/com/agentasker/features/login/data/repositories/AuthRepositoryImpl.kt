@@ -95,8 +95,6 @@ class AuthRepositoryImpl @Inject constructor(
     }
 
     override fun observeIsLoggedIn(): Flow<Boolean> {
-        // observeAuthToken() emite cada vez que el DataStore cambia. Cuando
-        // TokenAuthenticator llama clearAll() tras un 401, emite null → false.
         return secureStorage.observeAuthToken().map { it != null }
     }
 }

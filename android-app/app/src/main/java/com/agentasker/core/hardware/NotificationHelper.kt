@@ -50,13 +50,6 @@ class NotificationHelper @Inject constructor(
             }
             notificationManager.createNotificationChannel(pushChannel)
 
-            // Canal LOW para progreso de workers de IA — sin sonido ni
-            // vibración para no molestar mientras corre en background.
-            // Android usa IMPORTANCE_LOW para NO hacer heads-up (HUN) y
-            // no impactar la reputación del remitente frente al sistema
-            // (que degrada apps que abusan de notificaciones intrusivas).
-            // Además deshabilitamos sonido, vibración y luces por si el
-            // usuario tiene alguna anulación a nivel de canal.
             val aiChannel = NotificationChannel(
                 AI_PROGRESS_CHANNEL,
                 "Procesos de IA",
@@ -72,11 +65,6 @@ class NotificationHelper @Inject constructor(
         }
     }
 
-    /**
-     * Construye una notificación "en curso" usada como foreground info
-     * desde los workers de IA. El ID debe ser estable por worker para
-     * que WorkManager pueda reemplazarla al actualizar progreso.
-     */
     fun buildAiProgressNotification(title: String, body: String): Notification {
         return NotificationCompat.Builder(context, AI_PROGRESS_CHANNEL)
             .setSmallIcon(R.drawable.ic_notification)
@@ -89,21 +77,6 @@ class NotificationHelper @Inject constructor(
             .build()
     }
 
-    /**
-     * Muestra una notificación final (éxito o fallo) cuando un worker
-     * de IA termina. Al tocarla abre la app con deep link a `screen`.
-     *
-     * Notas de reputación con el SO:
-     *  - Usa el canal AI_PROGRESS_CHANNEL (IMPORTANCE_LOW) que ya NO hace
-     *    heads-up, no suena y no vibra.
-     *  - Forzamos PRIORITY_LOW y setSilent(true) independientemente de si
-     *    es éxito o fallo. En Android, notificaciones no-intrusivas NO
-     *    degradan el "reputation score" del remitente. Usar PRIORITY_HIGH
-     *    para errores de IA sería categorizarlos como urgentes, lo cual
-     *    el sistema penaliza si el usuario las descarta sistemáticamente.
-     *  - setCategory(CATEGORY_STATUS) le dice al OS que es un status
-     *    update pasivo, no un alert.
-     */
     fun showAiResultNotification(
         title: String,
         body: String,
@@ -138,10 +111,6 @@ class NotificationHelper @Inject constructor(
     }
 
     fun showPushNotification(title: String, body: String, data: Map<String, String> = emptyMap()) {
-        // FLAG_ACTIVITY_SINGLE_TOP en vez de CLEAR_TASK para que, si la Activity
-        // ya está en el top del stack, Android invoque onNewIntent() con los
-        // extras en lugar de recrearla desde cero — así el deep link se procesa
-        // sin perder el estado de navegación actual.
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
             data.forEach { (k, v) -> putExtra(k, v) }
@@ -212,7 +181,6 @@ class NotificationHelper @Inject constructor(
         const val PUSH_CHANNEL = "push_notifications"
         const val AI_PROGRESS_CHANNEL = "ai_progress"
 
-        // IDs estables para notifications en curso (foreground workers).
         const val AI_SUBTASK_WORKER_NOTIFICATION_ID = 2001
         const val AI_IMAGE_WORKER_NOTIFICATION_ID = 2002
     }

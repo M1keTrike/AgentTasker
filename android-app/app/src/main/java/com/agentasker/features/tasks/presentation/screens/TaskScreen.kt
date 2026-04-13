@@ -45,7 +45,7 @@ fun TaskScreen(
 
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
-    ) { /* Permission result handled silently */ }
+    ) { }
 
     LaunchedEffect(Unit) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -68,10 +68,6 @@ fun TaskScreen(
     }
 
     if (uiState.showDialog) {
-        // Cuando editamos una task existente mostramos también su lista
-        // de subtasks para que el usuario pueda editar/agregar/borrar
-        // manualmente. Para tasks nuevas no hay id todavía, así que la
-        // sección solo existe en modo edición.
         val editingTaskId = uiState.taskToEdit?.id
         val subtasksForEditing = editingTaskId?.let { id ->
             uiState.tasks.firstOrNull { it.id == id }?.subtasks.orEmpty()

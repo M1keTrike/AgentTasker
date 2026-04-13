@@ -23,13 +23,6 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-/**
- * Kanban ahora se alimenta SOLO de Room vía `taskRepository.observeTasks()`.
- * Se eliminó `classroomRepository.getAllTasks()` que pegaba directo a la API
- * de Google y mostraba TODOS los cursos ignorando la selección del picker.
- * Las tasks de Classroom sincronizadas ya llegan a Room como cualquier otra
- * task (con `source = "classroom"`) y se mapean a `KanbanItem.TaskItem`.
- */
 @HiltViewModel
 class KanbanViewModel @Inject constructor(
     private val observeColumnsUseCase: ObserveKanbanColumnsUseCase,
@@ -72,9 +65,6 @@ class KanbanViewModel @Inject constructor(
                 observeColumnsUseCase(),
                 taskRepository.observeTasks()
             ) { columns, tasks ->
-                // Todas las tasks (locales + Classroom sincronizadas) se
-                // mapean a TaskItem. Ya no existe ClassroomItem como fuente
-                // separada — unificamos todo por Room.
                 val taskItems = tasks.map { KanbanItem.TaskItem(it) }
                 val tasksByStatus = taskItems.groupBy { it.status }
                 Pair(columns, tasksByStatus)
@@ -205,7 +195,7 @@ class KanbanViewModel @Inject constructor(
                             status = newStatusKey
                         )
                     }
-                    is KanbanItem.ClassroomItem -> { /* legacy: no-op */ }
+                    is KanbanItem.ClassroomItem -> { }
                 }
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(

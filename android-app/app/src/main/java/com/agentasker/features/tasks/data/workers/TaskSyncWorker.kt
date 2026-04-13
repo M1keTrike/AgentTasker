@@ -41,8 +41,6 @@ class TaskSyncWorker @AssistedInject constructor(
 
         var hasFailures = false
 
-        // ---------- Sync tasks primero: las subtasks dependen de un id
-        // remoto de task, así que conviene crear la task antes. ----------
         for (task in pendingTasks) {
             try {
                 Log.d(
@@ -64,21 +62,15 @@ class TaskSyncWorker @AssistedInject constructor(
                             externalLink = task.externalLink
                         )
                         val oldId = task.id
-                        // Capturamos los subtasks locales ANTES de borrar la
-                        // task: la FK con CASCADE los borraría al hacer
-                        // deleteTaskById, y queremos re-adjuntarlos al id
-                        // remoto tras la creación exitosa.
                         val orphanSubtasks = subtaskDao.getByTaskId(oldId)
 
                         val response = api.createTask(request)
                         val syncedEntity = response.toEntity(isSynced = true)
-                        taskDao.deleteTaskById(oldId) // CASCADE borra los subtasks también
+                        taskDao.deleteTaskById(oldId)
                         taskDao.upsertTask(syncedEntity)
 
                         if (orphanSubtasks.isNotEmpty()) {
                             val reassigned = orphanSubtasks.map {
-                                // Nuevo ID local para evitar colisionar con
-                                // el PK del viejo registro (ya borrado).
                                 it.copy(
                                     id = "local_sub_${System.nanoTime()}_${it.position}",
                                     taskId = syncedEntity.id,
@@ -130,11 +122,8 @@ class TaskSyncWorker @AssistedInject constructor(
             }
         }
 
-        // ---------- Subtasks ----------
-        // Re-fetch porque el paso anterior puede haber re-marcado algunas.
         val subsToSync = subtaskDao.getPending()
 
-        // Agrupamos por taskId y acción "create" para aprovechar bulk.
         val createsByTask = subsToSync
             .filter { it.pendingAction == "create" && it.taskId.toIntOrNull() != null }
             .groupBy { it.taskId }
@@ -146,7 +135,6 @@ class TaskSyncWorker @AssistedInject constructor(
                     taskId.toInt(),
                     BulkCreateSubtasksRequest(subtasks = titles)
                 )
-                // Borrar los locales orphan y guardar los remotos.
                 subs.forEach { subtaskDao.deleteById(it.id) }
                 val synced = response.map { dto ->
                     SubtaskEntity(
@@ -168,7 +156,6 @@ class TaskSyncWorker @AssistedInject constructor(
             }
         }
 
-        // Updates y deletes individuales.
         for (sub in subsToSync.filter { it.pendingAction == "update" && it.id.toIntOrNull() != null }) {
             try {
                 val response = api.updateSubtask(

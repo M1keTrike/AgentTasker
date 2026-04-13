@@ -24,17 +24,8 @@ import kotlinx.coroutines.launch
 import java.time.Instant
 import javax.inject.Inject
 
-/**
- * Convierte un timestamp (millis desde epoch) a un string ISO 8601 en UTC,
- * formato aceptado por `@IsDateString()` del backend NestJS.
- *
- * Ejemplo: `1744409383353` → `"2026-04-11T20:09:43.353Z"`.
- */
 private fun Long.toIsoString(): String = Instant.ofEpochMilli(this).toString()
 
-/**
- * Parsea un string ISO 8601 a millis. Retorna null si el string es inválido.
- */
 private fun String.toEpochMillisOrNull(): Long? = try {
     Instant.parse(this).toEpochMilli()
 } catch (_: Exception) {
@@ -103,11 +94,7 @@ class TaskViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
 
-            // Si el usuario puso un recordatorio desde el picker, eso se envía
-            // como `dueDate` al backend para que el cron del server dispare el
-            // push. El `reminderAt` sigue programando el AlarmManager local
-            // como respaldo offline.
-            val effectiveDueDate = dueDate ?: reminderAt?.toIsoString()
+            val effectiveDueDate = reminderAt?.toIsoString() ?: dueDate
 
             createTaskUseCase(title, description, priority, status, effectiveDueDate).fold(
                 onSuccess = { task ->
@@ -135,10 +122,7 @@ class TaskViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
 
-            // Misma unificación que en createTask. Si el usuario cambió el
-            // reminder en el picker, el nuevo valor va como dueDate al backend
-            // para que el cron lo vuelva a disparar con la fecha actualizada.
-            val effectiveDueDate = dueDate ?: reminderAt?.toIsoString()
+            val effectiveDueDate = reminderAt?.toIsoString() ?: dueDate
 
             updateTaskUseCase(id, title, description, priority, status, effectiveDueDate).fold(
                 onSuccess = {
@@ -202,9 +186,6 @@ class TaskViewModel @Inject constructor(
     }
 
     fun showEditDialog(task: Task) {
-        // Si la task ya viene del backend con un dueDate, lo usamos como
-        // reminderAt inicial para que el picker muestre la fecha correcta.
-        // Si no, intentamos leer el reminder local guardado en Room.
         val initialReminderFromDueDate = task.dueDate?.toEpochMillisOrNull()
 
         _uiState.value = _uiState.value.copy(
@@ -262,20 +243,6 @@ class TaskViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(formReminderAt = reminderAt)
     }
 
-    // ---------- Subtasks + IA ----------
-
-    /**
-     * Encola el worker que pide a DeepSeek que descomponga la task en
-     * subtareas. El worker corre como foreground y sobrevive al kill de
-     * la app. El usuario verá una notificación de progreso y luego otra
-     * de éxito/fallo cuando termine. No bloqueamos la UI aquí.
-     *
-     * Si la task ya tiene subtasks (manuales o de IA anterior), estas se
-     * sobreescriben — el worker llama a `replaceSubtasks()` en el repo.
-     *
-     * Si la task no tiene descripción, se rechaza la acción con un mensaje
-     * al usuario — sin descripción no hay contexto para dividir.
-     */
     fun splitWithAi(task: Task) {
         if (task.description.isBlank()) {
             _uiState.value = _uiState.value.copy(
@@ -305,11 +272,6 @@ class TaskViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Handler del botón verde "Completar y archivar" que aparece cuando
-     * todas las subtasks están tachadas. Marca la task como completed +
-     * archived y cancela cualquier recordatorio local asociado.
-     */
     fun completeAndArchive(taskId: String) {
         viewModelScope.launch {
             try {
@@ -328,11 +290,6 @@ class TaskViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Añade una subtarea manual a la task que se está editando en el
-     * dialog. Se persiste inmediatamente (offline-first) para que
-     * aparezca en la lista observada por el form.
-     */
     fun addManualSubtask(taskId: String, title: String) {
         if (title.isBlank()) return
         viewModelScope.launch {
@@ -346,9 +303,6 @@ class TaskViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Renombra una subtarea existente desde el dialog de edición.
-     */
     fun renameSubtask(subtaskId: String, newTitle: String) {
         if (newTitle.isBlank()) return
         viewModelScope.launch {
@@ -362,9 +316,6 @@ class TaskViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Borra una subtarea desde el dialog de edición.
-     */
     fun deleteSubtask(subtaskId: String) {
         viewModelScope.launch {
             try {

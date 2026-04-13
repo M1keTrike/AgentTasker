@@ -7,11 +7,6 @@ import { ClassroomTaskDto } from './dto/classroom-task.dto';
 
 const CLASSROOM_API = 'https://classroom.googleapis.com/v1';
 
-/**
- * Duración del cache en milisegundos. 5 minutos es un buen balance: el
- * usuario no necesita datos de Classroom actualizados al segundo, pero sí
- * que reflejen cambios razonablemente rápido.
- */
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
 interface CacheEntry<T> {
@@ -24,11 +19,6 @@ export class ClassroomService {
   private readonly logger = new Logger(ClassroomService.name);
   private readonly oauth2Client: OAuth2Client;
 
-  /**
-   * Cache in-memory por userId. Se invalida automáticamente por TTL.
-   * En un despliegue multi-instancia habría que usar Redis, pero para
-   * la escala actual (un usuario por vez) basta con un Map en memoria.
-   */
   private readonly coursesCache = new Map<
     number,
     CacheEntry<ClassroomCourseDto[]>
@@ -86,7 +76,6 @@ export class ClassroomService {
   }
 
   async getCourses(userId: number): Promise<ClassroomCourseDto[]> {
-    // Cache hit?
     const cached = this.coursesCache.get(userId);
     if (this.isCacheValid(cached)) {
       this.logger.debug(
@@ -186,13 +175,6 @@ export class ClassroomService {
     return tasks;
   }
 
-  /**
-   * Devuelve todas las tasks de todos los cursos. El resultado se cachea
-   * durante CACHE_TTL_MS (5 minutos). Esto evita pegar a la API de Google
-   * Classroom en cada request del Android (Dashboard, Kanban, sync, etc.)
-   * y resuelve el 429 RESOURCE_EXHAUSTED que aparecía con el flujo
-   * anterior sin cache.
-   */
   async getAllTasks(userId: number): Promise<ClassroomTaskDto[]> {
     const cached = this.allTasksCache.get(userId);
     if (this.isCacheValid(cached)) {
@@ -223,10 +205,6 @@ export class ClassroomService {
     return allTasks;
   }
 
-  /**
-   * Invalida el cache de un usuario. Útil tras un re-link de Classroom
-   * o un sync manual forzado.
-   */
   invalidateCache(userId: number): void {
     this.coursesCache.delete(userId);
     this.allTasksCache.delete(userId);

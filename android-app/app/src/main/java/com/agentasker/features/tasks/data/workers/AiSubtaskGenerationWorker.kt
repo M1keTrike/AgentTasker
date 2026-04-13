@@ -16,14 +16,6 @@ import com.agentasker.features.tasks.domain.repositories.TaskRepository
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 
-/**
- * Worker que usa DeepSeek para dividir una task existente en subtasks.
- * Se ejecuta como expedited + setForeground con notificación de progreso,
- * de modo que sobreviva aunque el usuario cierre la app.
- *
- * Input data:
- *   KEY_TASK_ID -> String (id local o remoto de la task a dividir)
- */
 @HiltWorker
 class AiSubtaskGenerationWorker @AssistedInject constructor(
     @Assisted appContext: Context,
@@ -58,7 +50,6 @@ class AiSubtaskGenerationWorker @AssistedInject constructor(
         val taskId = inputData.getString(KEY_TASK_ID) ?: return Result.failure()
         Log.d(TAG, "doWork start taskId=$taskId")
 
-        // Elevar a foreground para sobrevivir a un kill del proceso.
         try { setForeground(getForegroundInfo()) } catch (e: Exception) {
             Log.w(TAG, "setForeground failed: ${e.message}")
         }
@@ -69,9 +60,6 @@ class AiSubtaskGenerationWorker @AssistedInject constructor(
             return Result.failure()
         }
 
-        // Si la task no tiene descripción, rechazamos aquí también como
-        // defensa en profundidad (la UI ya valida, pero el worker puede
-        // ser invocado directamente).
         if (task.description.isBlank()) {
             notifyResult(
                 success = false,
@@ -89,9 +77,6 @@ class AiSubtaskGenerationWorker @AssistedInject constructor(
                 return Result.failure()
             }
 
-            // Reemplaza las subtasks existentes (manuales o de una IA
-            // previa) en vez de append — cada vez que el usuario toca
-            // "Dividir con IA" arranca de cero.
             taskRepository.replaceSubtasks(taskId, titles)
 
             notifyResult(

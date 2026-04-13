@@ -28,11 +28,6 @@ class AgentTaskerApplication : Application(), Configuration.Provider {
         fetchInitialFcmToken()
     }
 
-    /**
-     * Obtiene el token FCM actual del dispositivo y lo pasa al repositorio.
-     * `onNewToken` del [com.agentasker.core.notifications.AgentTaskerMessagingService]
-     * solo se dispara al rotar, por lo que en primer arranque hay que pedirlo.
-     */
     private fun fetchInitialFcmToken() {
         FirebaseMessaging.getInstance().token
             .addOnSuccessListener { token ->

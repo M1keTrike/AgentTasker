@@ -55,19 +55,11 @@ class LoginViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Observa el DataStore de tokens. Cuando el [TokenAuthenticator]
-     * llama `clearAll()` tras un 401 irrecuperable (backend reiniciado,
-     * JWT_SECRET cambiado, etc.), el Flow emite `false` y nosotros
-     * reseteamos [LoginUiState] a no-autenticado. Esto fuerza la
-     * navegación al LoginRoute en [AgentTaskerApp] porque `startDestination`
-     * se re-evalúa cuando `isAuthenticated` cambia.
-     */
     private fun observeSessionValidity() {
         viewModelScope.launch {
             observeAuthStateUseCase().collect { isLoggedIn ->
                 if (!isLoggedIn && _uiState.value.isAuthenticated) {
-                    _uiState.value = LoginUiState() // reset completo
+                    _uiState.value = LoginUiState()
                 }
             }
         }

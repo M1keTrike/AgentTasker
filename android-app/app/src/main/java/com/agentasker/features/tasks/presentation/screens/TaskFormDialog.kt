@@ -136,8 +136,6 @@ fun TaskFormDialog(
                     onClearReminder = { onReminderAtChange(null) }
                 )
 
-                // Sección de subtasks: solo visible al editar una task
-                // existente (necesitamos un taskId para crear subtasks).
                 if (task != null) {
                     HorizontalDivider()
                     Text(
@@ -162,7 +160,6 @@ fun TaskFormDialog(
                             }
                         }
                     }
-                    // Fila para agregar una subtarea nueva.
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
@@ -277,12 +274,6 @@ fun TaskFormDialog(
                         Spacer(modifier = Modifier.width(8.dp))
                         Button(onClick = {
                             selectedDateMillis?.let { dateMillis ->
-                                // `datePickerState.selectedDateMillis` devuelve medianoche
-                                // UTC del día seleccionado. Si construimos un Calendar local
-                                // directamente con ese instante, caemos en el día anterior
-                                // cuando la zona horaria del dispositivo es negativa (ej. GMT-6).
-                                // Solución: extraer Y/M/D usando un Calendar en UTC y
-                                // combinarlos con la hora local del TimePicker.
                                 val utcCal = Calendar.getInstance(
                                     TimeZone.getTimeZone("UTC")
                                 ).apply { timeInMillis = dateMillis }
@@ -315,9 +306,6 @@ private fun SubtaskEditRow(
     onRename: (String) -> Unit,
     onDelete: () -> Unit
 ) {
-    // Estado local con el texto: solo se persiste al perder el foco
-    // o al tocar el confirm del keyboard, para no spamear al repo con
-    // una llamada por cada tecla.
     var editedTitle by remember(subtask.id, subtask.title) { mutableStateOf(subtask.title) }
 
     Row(

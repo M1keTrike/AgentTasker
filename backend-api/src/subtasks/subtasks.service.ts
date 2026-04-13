@@ -16,10 +16,6 @@ export class SubtasksService {
     private readonly taskRepository: Repository<Task>,
   ) {}
 
-  /**
-   * Verifica que la task exista y pertenezca al usuario antes de tocar
-   * cualquier subtask. Lanza 404 si no, consistente con TasksService.
-   */
   private async assertTaskOwnership(
     taskId: number,
     userId: number,
@@ -40,7 +36,6 @@ export class SubtasksService {
   ): Promise<Subtask> {
     await this.assertTaskOwnership(taskId, userId);
 
-    // Si no llega position explícita, colocamos la subtask al final.
     let position = dto.position;
     if (position === undefined) {
       const count = await this.subtaskRepository.count({ where: { taskId } });
@@ -63,8 +58,6 @@ export class SubtasksService {
   ): Promise<Subtask[]> {
     await this.assertTaskOwnership(taskId, userId);
 
-    // Arrancamos la secuencia de `position` después de las existentes para
-    // no colisionar si la task ya tenía subtasks manuales.
     const existingCount = await this.subtaskRepository.count({
       where: { taskId },
     });
@@ -98,7 +91,6 @@ export class SubtasksService {
     if (!subtask) {
       throw new NotFoundException(`Subtask with ID ${id} not found`);
     }
-    // Valida ownership a través del taskId (sin traer la task completa).
     await this.assertTaskOwnership(subtask.taskId, userId);
 
     Object.assign(subtask, dto);

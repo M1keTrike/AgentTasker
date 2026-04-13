@@ -69,12 +69,6 @@ fun TaskCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    // El badge va en su PROPIA línea arriba del título.
-                    // Antes estaba inline con el título, pero entre el
-                    // badge + los 3 IconButtons de la Row padre, al Text
-                    // le quedaba un ancho tan chico que Compose wrapeaba
-                    // a 1 carácter por línea. Separarlos garantiza que
-                    // el título tenga todo el ancho de la Column.
                     if (isClassroom) {
                         ClassroomBadge()
                         Spacer(modifier = Modifier.height(6.dp))
@@ -112,11 +106,6 @@ fun TaskCard(
                             )
                         }
                     }
-                    // Aunque la task venga de Classroom, como ahora vive
-                    // en la tabla local el usuario puede editarla,
-                    // archivarla y borrarla a voluntad. Si re-sincroniza
-                    // Classroom, el repo preserva los flags locales
-                    // (isArchived, status) por idempotencia.
                     IconButton(onClick = onEdit) {
                         Icon(
                             imageVector = Icons.Default.Edit,
@@ -155,10 +144,6 @@ fun TaskCard(
                 }
             }
 
-            // Cuando TODAS las subtasks están tachadas, aparece el botón
-            // verde "Completar y archivar". Se muestra para cualquier
-            // task (local o Classroom) porque el archivado vive en la
-            // DB local.
             if (task.allSubtasksCompleted && onComplete != null) {
                 Spacer(modifier = Modifier.height(12.dp))
                 Button(

@@ -24,9 +24,6 @@ class HapticFeedbackManager @Inject constructor(
 
     private fun canVibrate(): Boolean = vibrator.hasVibrator()
 
-    /**
-     * Vibración positiva corta — completar/actualizar tarea exitosamente.
-     */
     fun success() {
         if (!canVibrate()) return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -39,9 +36,6 @@ class HapticFeedbackManager @Inject constructor(
         }
     }
 
-    /**
-     * Vibración de advertencia doble — eliminar tarea.
-     */
     fun warning() {
         if (!canVibrate()) return
         val pattern = longArrayOf(0, 80, 100, 80)
@@ -55,9 +49,6 @@ class HapticFeedbackManager @Inject constructor(
         }
     }
 
-    /**
-     * Vibración de notificación — nuevas tareas de Classroom encontradas.
-     */
     fun notification() {
         if (!canVibrate()) return
         val pattern = longArrayOf(0, 100, 50, 100, 50, 150)
@@ -71,9 +62,6 @@ class HapticFeedbackManager @Inject constructor(
         }
     }
 
-    /**
-     * Tick ligero — interacciones como swipe-to-dismiss al alcanzar threshold.
-     */
     fun tick() {
         if (!canVibrate()) return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {

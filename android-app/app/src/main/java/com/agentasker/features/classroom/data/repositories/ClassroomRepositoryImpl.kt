@@ -30,7 +30,6 @@ class ClassroomRepositoryImpl @Inject constructor(
     companion object {
         private const val REDIRECT_URI = "https://agentaskerapi.alphahills.site/auth/classroom/callback"
 
-        // Estados que cuentan como "tarea pendiente para el alumno".
         private val PENDING_STATES = setOf(
             SubmissionState.NEW,
             SubmissionState.CREATED,
@@ -154,9 +153,6 @@ class ClassroomRepositoryImpl @Inject constructor(
     }
 
     private fun ClassroomTask.toLocalTask(): Task {
-        // Classroom no expone prioridad. Derivamos una prioridad por heurística
-        // sencilla: si la due date está a menos de 48h, "high"; menos de 7 días,
-        // "medium"; resto, "low". Si no hay dueDate, default medium.
         val priority = dueDate?.let {
             val hoursUntil = java.time.Duration.between(LocalDateTime.now(), it).toHours()
             when {
@@ -168,7 +164,7 @@ class ClassroomRepositoryImpl @Inject constructor(
         } ?: "medium"
 
         return Task(
-            id = "cls_$id", // placeholder local; upsertImportedTask re-usa existing si hay match por externalId
+            id = "cls_$id",
             title = title,
             description = description.orEmpty(),
             priority = priority,

@@ -46,14 +46,6 @@ sealed interface DashboardUiState {
     data class Error(val message: String) : DashboardUiState
 }
 
-/**
- * ViewModel del Dashboard. Ahora se alimenta SOLO de la tabla local `tasks`
- * (Room), que ya incluye las tasks de Classroom sincronizadas. Ya NO llama
- * a `getClassroomTasksUseCase()` (API de Google) — eso eliminó:
- *  - Llamadas extras a Google (evitando 429)
- *  - Cursos no-sincronizados apareciendo en las estadísticas
- *  - Conteos duplicados (tasks locales + tasks remotas de Classroom)
- */
 @HiltViewModel
 class DashboardViewModel @Inject constructor(
     private val getTasksUseCase: GetTasksUseCase,
@@ -121,7 +113,6 @@ class DashboardViewModel @Inject constructor(
         val now = LocalDateTime.now()
         val threeDaysFromNow = now.plusDays(3)
 
-        // --- Próximas entregas: de TODAS las tasks locales con dueDate ---
         val upcomingItems = tasks.mapNotNull { task ->
             val dueLocal = task.dueDate?.toLocalDateTimeOrNull() ?: return@mapNotNull null
             UpcomingItem(
@@ -134,13 +125,11 @@ class DashboardViewModel @Inject constructor(
             .sortedBy { it.dueDate }
             .take(5)
 
-        // --- Por vencer: tasks con dueDate en los próximos 3 días ---
         val dueSoonCount = tasks.count { task ->
             val dl = task.dueDate?.toLocalDateTimeOrNull() ?: return@count false
             dl.isAfter(now) && dl.isBefore(threeDaysFromNow)
         }
 
-        // --- Cursos activos: solo de tasks de Classroom YA sincronizadas ---
         val classroomTasks = tasks.filter { it.source == TaskSource.CLASSROOM }
         val activeCourses = classroomTasks
             .mapNotNull { it.courseName }
@@ -150,9 +139,7 @@ class DashboardViewModel @Inject constructor(
             .sortedByDescending { it.pendingCount }
 
         return DashboardUiState.Success(
-            // Pendientes = tasks activas (no archivadas, Room ya filtra eso)
             pendingCount = tasks.size,
-            // Completadas = solo las archivadas (el flujo explícito del usuario)
             completedCount = archivedTasks.size,
             dueSoonCount = dueSoonCount,
             upcomingDeadlines = upcomingItems,
@@ -165,11 +152,6 @@ class DashboardViewModel @Inject constructor(
     }
 }
 
-/**
- * Parsea un string ISO 8601 (como "2026-04-12T16:50:00.000Z" o
- * "2026-05-24T04:59:00") a [LocalDateTime] en la zona horaria local.
- * Retorna null si el formato no es válido.
- */
 @SuppressLint("NewApi")
 private fun String.toLocalDateTimeOrNull(): LocalDateTime? = try {
     val instant = Instant.parse(this)

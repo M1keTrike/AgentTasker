@@ -50,8 +50,6 @@ interface AgentTaskerApi {
     @DELETE("tasks/{id}")
     suspend fun deleteTask(@Path("id") id: Int): Response<Unit>
 
-    // ---------- Subtasks ----------
-
     @GET("tasks/{taskId}/subtasks")
     suspend fun getSubtasks(@Path("taskId") taskId: Int): List<SubtaskDTO>
 

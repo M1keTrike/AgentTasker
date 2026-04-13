@@ -20,19 +20,6 @@ import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.tasks.await
 
-/**
- * Worker que analiza una foto:
- *   1. Carga el Uri (local content://) como InputImage.
- *   2. Corre ML Kit Text Recognition on-device → ocrText.
- *   3. Envía el OCR a DeepSeek para que proponga una task completa
- *      (title, description, priority, subtasks).
- *   4. Crea la Task en Room/backend + las subtasks.
- *
- * Ejecuta como foreground service-type data-sync para sobrevivir al kill.
- *
- * Input data:
- *   KEY_IMAGE_URI -> String (Uri.toString())
- */
 @HiltWorker
 class AiImageAnalysisWorker @AssistedInject constructor(
     @Assisted appContext: Context,
@@ -72,25 +59,21 @@ class AiImageAnalysisWorker @AssistedInject constructor(
         }
 
         return try {
-            // 1. OCR on-device. ML Kit no sube nada a la red.
             val image = InputImage.fromFilePath(applicationContext, uri)
             val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
             val visionText = recognizer.process(image).await()
             val ocrText = visionText.text
             Log.d(TAG, "OCR extracted ${ocrText.length} chars")
 
-            // 2. DeepSeek arma la task propuesta.
             val draft = aiTaskService.analyzeOcrToTask(ocrText)
             Log.d(TAG, "Draft title=${draft.title} subtasks=${draft.subtasks.size}")
 
-            // 3. Crear la task en Room/backend. Offline-first.
             val created = taskRepository.createTask(
                 title = draft.title,
                 description = draft.description,
                 priority = draft.priority
             )
 
-            // 4. Subtasks (si las hay).
             if (draft.subtasks.isNotEmpty()) {
                 taskRepository.createSubtasksBulk(created.id, draft.subtasks)
             }

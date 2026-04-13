@@ -65,13 +65,8 @@ class MainActivity : ComponentActivity() {
 
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { /* granted: no-op; si se niega, el usuario simplemente no verá pushes */ }
+    ) { }
 
-    /**
-     * Deep link pendiente de procesar. Se llena cuando la Activity arranca
-     * desde una notificación o cuando recibe `onNewIntent` con un payload
-     * que contiene `screen=...`. El Composable lo observa y navega.
-     */
     private val pendingDeepLink: MutableStateFlow<DeepLink?> = MutableStateFlow(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -93,21 +88,12 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    /**
-     * Se invoca cuando la Activity ya estaba creada (launchMode=singleTop)
-     * y Android reentrega un intent — por ejemplo cuando el usuario toca
-     * una notificación estando la app en foreground o background.
-     */
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
         DeepLink.fromIntent(intent)?.let { pendingDeepLink.value = it }
     }
 
-    /**
-     * Pide el permiso `POST_NOTIFICATIONS` en tiempo de ejecución (Android 13+).
-     * En versiones anteriores el permiso se concede automáticamente en el Manifest.
-     */
     private fun ensureNotificationPermission() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
 
@@ -137,14 +123,10 @@ fun AgentTaskerApp(
 
     val deepLink by pendingDeepLink.collectAsState()
 
-    // Navegación reactiva a un deep link. Solo dispara cuando el usuario ya
-    // está autenticado (si no, lo dejamos pendiente hasta que haga login).
     LaunchedEffect(deepLink, loginUiState.isAuthenticated) {
         val target = deepLink ?: return@LaunchedEffect
         if (!loginUiState.isAuthenticated) return@LaunchedEffect
 
-        // DeepLink.Classroom redirige a Tasks: el tab Classroom ya no existe,
-        // las tasks importadas viven en la misma pantalla de "Tareas".
         val route: Any = when (target) {
             DeepLink.Dashboard -> DashboardRoute
             DeepLink.Tasks -> TasksRoute
@@ -160,11 +142,6 @@ fun AgentTaskerApp(
         onDeepLinkConsumed()
     }
 
-    // Cuando la sesión muere (TokenAuthenticator llama clearAll() tras 401
-    // irrecuperable → observeAuthStateUseCase emite false → LoginUiState
-    // se resetea), este LaunchedEffect fuerza navegación al Login y limpia
-    // el back stack. Sin esto, el usuario queda atrapado en Dashboard con
-    // 401 permanentes porque NavHost no re-evalúa startDestination.
     LaunchedEffect(loginUiState.isAuthenticated) {
         if (!loginUiState.isAuthenticated) {
             navController.navigate(LoginRoute) {

@@ -18,14 +18,6 @@ import { UpdateSubtaskDto } from './dto/update-subtask.dto';
 import { BulkCreateSubtasksDto } from './dto/bulk-create-subtasks.dto';
 import { JwtAuthGuard } from '../users/guards/jwt-auth.guard';
 
-/**
- * Rutas:
- *   POST   /tasks/:taskId/subtasks         (single)
- *   POST   /tasks/:taskId/subtasks/bulk    (array, usado por el flujo IA)
- *   GET    /tasks/:taskId/subtasks
- *   PATCH  /subtasks/:id
- *   DELETE /subtasks/:id
- */
 @UseGuards(JwtAuthGuard)
 @Controller()
 export class SubtasksController {

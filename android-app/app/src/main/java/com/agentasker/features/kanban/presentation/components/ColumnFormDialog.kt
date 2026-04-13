@@ -30,24 +30,19 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
-/**
- * Paleta preset para seleccionar color de columna sin requerir un color
- * picker complejo. Son 12 tonos Material balanceados que contrastan bien
- * sobre `surfaceVariant`. El usuario elige uno tocando su círculo.
- */
 private val PRESET_COLORS = listOf(
-    "#EF5350", // rojo
-    "#EC407A", // rosa
-    "#AB47BC", // púrpura
-    "#7E57C2", // violeta
-    "#5C6BC0", // indigo
-    "#42A5F5", // azul
-    "#26C6DA", // cian
-    "#26A69A", // teal
-    "#66BB6A", // verde
-    "#FFCA28", // ámbar
-    "#FFA726", // naranja
-    "#8D6E63"  // marrón
+    "#EF5350",
+    "#EC407A",
+    "#AB47BC",
+    "#7E57C2",
+    "#5C6BC0",
+    "#42A5F5",
+    "#26C6DA",
+    "#26A69A",
+    "#66BB6A",
+    "#FFCA28",
+    "#FFA726",
+    "#8D6E63"
 )
 
 @Composable
@@ -118,8 +113,6 @@ private fun ColorSwatchPicker(
     selectedColor: String?,
     onColorSelected: (String?) -> Unit
 ) {
-    // 2 filas × 6 columnas = 12 swatches. LazyGrid sería overkill
-    // para 12 elementos, así que usamos Row + chunked.
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         PRESET_COLORS.chunked(6).forEach { rowColors ->
             Row(
@@ -131,8 +124,6 @@ private fun ColorSwatchPicker(
                         hex = hex,
                         selected = selectedColor.equals(hex, ignoreCase = true),
                         onClick = {
-                            // Toggle: tocar el mismo color lo deselecciona,
-                            // volviendo al color default del tema.
                             if (selectedColor.equals(hex, ignoreCase = true)) {
                                 onColorSelected(null)
                             } else {

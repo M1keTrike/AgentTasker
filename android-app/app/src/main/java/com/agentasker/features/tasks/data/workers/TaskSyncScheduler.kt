@@ -51,10 +51,6 @@ class TaskSyncScheduler @Inject constructor(
             )
     }
 
-    /**
-     * Encola el worker que pide subtareas a DeepSeek para una task existente.
-     * Expedited para arrancar rápido; si no hay cuota, cae a work normal.
-     */
     fun scheduleAiSplit(taskId: String) {
         val constraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.CONNECTED)
@@ -76,10 +72,6 @@ class TaskSyncScheduler @Inject constructor(
             )
     }
 
-    /**
-     * Encola el worker que hace OCR + DeepSeek para una foto y crea
-     * una task nueva con sus subtasks.
-     */
     fun scheduleImageAnalysis(imageUri: Uri) {
         val constraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.CONNECTED)
