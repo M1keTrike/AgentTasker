@@ -1,6 +1,9 @@
 package com.agentasker.features.dashboard.presentation.screens
 
 import android.annotation.SuppressLint
+import android.app.Activity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,21 +20,38 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Assignment
+import androidx.compose.material.icons.filled.DeleteForever
+import androidx.compose.material.icons.outlined.Archive
 import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.CloudSync
 import androidx.compose.material.icons.outlined.Flag
+import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.Pending
+import androidx.compose.material.icons.outlined.Restore
 import androidx.compose.material.icons.outlined.School
 import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -42,26 +62,66 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.agentasker.core.ui.components.LoadingState
 import com.agentasker.features.dashboard.presentation.components.DashboardCard
+import com.agentasker.features.dashboard.presentation.viewmodel.ClassroomIntegrationUiState
+import com.agentasker.features.dashboard.presentation.viewmodel.ClassroomIntegrationViewModel
 import com.agentasker.features.dashboard.presentation.viewmodel.DashboardUiState
 import com.agentasker.features.dashboard.presentation.viewmodel.DashboardViewModel
 import com.agentasker.features.dashboard.presentation.viewmodel.UpcomingItem
+import com.agentasker.features.tasks.domain.entities.Task
 import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardScreen(
     viewModel: DashboardViewModel = hiltViewModel(),
+    classroomViewModel: ClassroomIntegrationViewModel = hiltViewModel(),
     onNavigateToTasks: () -> Unit = {},
     onNavigateToClassroom: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val classroomState by classroomViewModel.uiState.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    val authLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK && result.data != null) {
+            classroomViewModel.onAuthResult(result.data!!)
+        }
+    }
+
+    LaunchedEffect(classroomState.error) {
+        classroomState.error?.let {
+            snackbarHostState.showSnackbar(it)
+            classroomViewModel.clearMessages()
+        }
+    }
+    LaunchedEffect(classroomState.infoMessage) {
+        classroomState.infoMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.refresh()
+            classroomViewModel.clearMessages()
+        }
+    }
+
+    if (classroomState.showCoursePicker) {
+        CoursePickerDialog(
+            state = classroomState,
+            onToggleCourse = classroomViewModel::toggleCourse,
+            onSelectAll = classroomViewModel::selectAllCourses,
+            onDeselectAll = classroomViewModel::deselectAllCourses,
+            onConfirm = classroomViewModel::syncSelectedCourses,
+            onDismiss = classroomViewModel::hideCoursePicker
+        )
+    }
 
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
                 title = { Text("Dashboard") }
             )
-        }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { innerPadding ->
         when (val state = uiState) {
             is DashboardUiState.Loading -> {
@@ -83,8 +143,19 @@ fun DashboardScreen(
             is DashboardUiState.Success -> {
                 DashboardContent(
                     state = state,
+                    classroomState = classroomState,
                     onNavigateToTasks = onNavigateToTasks,
                     onNavigateToClassroom = onNavigateToClassroom,
+                    onConnectClassroom = {
+                        authLauncher.launch(classroomViewModel.createAuthIntent())
+                    },
+                    onSyncClassroom = { classroomViewModel.showCoursePicker() },
+                    onDeleteArchived = { taskId ->
+                        viewModel.deleteArchivedPermanently(taskId)
+                    },
+                    onRestoreArchived = { taskId ->
+                        viewModel.restoreArchived(taskId)
+                    },
                     modifier = Modifier.padding(innerPadding)
                 )
             }
@@ -95,8 +166,13 @@ fun DashboardScreen(
 @Composable
 private fun DashboardContent(
     state: DashboardUiState.Success,
+    classroomState: ClassroomIntegrationUiState,
     onNavigateToTasks: () -> Unit,
     onNavigateToClassroom: () -> Unit,
+    onConnectClassroom: () -> Unit,
+    onSyncClassroom: () -> Unit,
+    onDeleteArchived: (String) -> Unit,
+    onRestoreArchived: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
@@ -154,6 +230,24 @@ private fun DashboardContent(
         }
 
         item {
+            ClassroomIntegrationCard(
+                state = classroomState,
+                onConnect = onConnectClassroom,
+                onSync = onSyncClassroom
+            )
+        }
+
+        if (state.archivedTasks.isNotEmpty()) {
+            item {
+                ArchivedTasksCard(
+                    archivedTasks = state.archivedTasks,
+                    onRestore = onRestoreArchived,
+                    onDelete = onDeleteArchived
+                )
+            }
+        }
+
+        item {
             DashboardCard(
                 title = "Estado de Classroom",
                 icon = Icons.Outlined.School,
@@ -177,6 +271,329 @@ private fun DashboardContent(
         }
 
         item { Spacer(modifier = Modifier.height(8.dp)) }
+    }
+}
+
+@Composable
+private fun ClassroomIntegrationCard(
+    state: ClassroomIntegrationUiState,
+    onConnect: () -> Unit,
+    onSync: () -> Unit
+) {
+    DashboardCard(
+        title = "Integraciones",
+        icon = Icons.Outlined.Link,
+        iconTint = Color(0xFF1976D2)
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.School,
+                    contentDescription = null,
+                    tint = Color(0xFF388E3C),
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Google Classroom",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        text = if (state.isConnected) "Conectado" else "No conectado",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (state.isConnected) Color(0xFF388E3C)
+                        else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            if (!state.isConnected) {
+                Button(
+                    onClick = onConnect,
+                    enabled = !state.isConnecting,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    if (state.isConnecting) {
+                        CircularProgressIndicator(
+                            strokeWidth = 2.dp,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                    } else {
+                        Icon(
+                            imageVector = Icons.Outlined.Link,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                    }
+                    Text("Conectar con Classroom")
+                }
+            } else {
+                OutlinedButton(
+                    onClick = onSync,
+                    enabled = !state.isSyncing,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    if (state.isSyncing) {
+                        CircularProgressIndicator(
+                            strokeWidth = 2.dp,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                    } else {
+                        Icon(
+                            imageVector = Icons.Outlined.CloudSync,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                    }
+                    Text(
+                        if (state.isSyncing) "Sincronizando…"
+                        else "Sincronizar Classroom"
+                    )
+                }
+
+                state.lastSyncCount?.let { count ->
+                    Text(
+                        text = "Última sincronización: $count tareas pendientes",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CoursePickerDialog(
+    state: ClassroomIntegrationUiState,
+    onToggleCourse: (String) -> Unit,
+    onSelectAll: () -> Unit,
+    onDeselectAll: () -> Unit,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val selectedCount = state.selectedCourseIds.size
+    val allSelected = state.courses.isNotEmpty() &&
+        selectedCount == state.courses.size
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Seleccionar cursos") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (state.isLoadingCourses) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(strokeWidth = 2.dp)
+                    }
+                } else if (state.courses.isEmpty()) {
+                    Text(
+                        text = "No se encontraron cursos activos.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                } else {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        TextButton(
+                            onClick = { if (allSelected) onDeselectAll() else onSelectAll() }
+                        ) {
+                            Text(
+                                text = if (allSelected) "Deseleccionar todos"
+                                else "Seleccionar todos",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        Spacer(modifier = Modifier.weight(1f))
+                        Text(
+                            text = "$selectedCount/${state.courses.size}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    state.courses.forEach { course ->
+                        val isSelected = course.id in state.selectedCourseIds
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(
+                                    if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                                    else Color.Transparent
+                                )
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            androidx.compose.material3.Checkbox(
+                                checked = isSelected,
+                                onCheckedChange = { onToggleCourse(course.id) }
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = course.name,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    maxLines = 2
+                                )
+                                course.section?.let { section ->
+                                    Text(
+                                        text = section,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                enabled = selectedCount > 0 && !state.isLoadingCourses
+            ) {
+                Text(
+                    if (selectedCount > 0) "Sincronizar ($selectedCount)"
+                    else "Sincronizar"
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancelar")
+            }
+        }
+    )
+}
+
+@Composable
+private fun ArchivedTasksCard(
+    archivedTasks: List<Task>,
+    onRestore: (String) -> Unit,
+    onDelete: (String) -> Unit
+) {
+    var taskPendingDelete by remember { mutableStateOf<Task?>(null) }
+
+    DashboardCard(
+        title = "Archivadas (${archivedTasks.size})",
+        icon = Icons.Outlined.Archive,
+        iconTint = Color(0xFF6D4C41)
+    ) {
+        if (archivedTasks.isEmpty()) {
+            Text(
+                text = "Aún no has archivado ninguna tarea.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                archivedTasks.take(10).forEach { task ->
+                    ArchivedTaskRow(
+                        task = task,
+                        onRestore = { onRestore(task.id) },
+                        onRequestDelete = { taskPendingDelete = task }
+                    )
+                }
+                if (archivedTasks.size > 10) {
+                    Text(
+                        text = "+${archivedTasks.size - 10} más",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+    }
+
+    taskPendingDelete?.let { task ->
+        AlertDialog(
+            onDismissRequest = { taskPendingDelete = null },
+            title = { Text("Eliminar permanentemente") },
+            text = {
+                Text(
+                    "¿Eliminar \"${task.title}\" de forma definitiva? Esta acción no se puede deshacer."
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onDelete(task.id)
+                        taskPendingDelete = null
+                    }
+                ) {
+                    Text(
+                        "Eliminar",
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { taskPendingDelete = null }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun ArchivedTaskRow(
+    task: Task,
+    onRestore: () -> Unit,
+    onRequestDelete: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = task.title,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1
+            )
+            if (task.subtasks.isNotEmpty()) {
+                Text(
+                    text = "${task.subtasks.size} subtareas",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        IconButton(onClick = onRestore) {
+            Icon(
+                imageVector = Icons.Outlined.Restore,
+                contentDescription = "Restaurar",
+                modifier = Modifier.size(20.dp),
+                tint = MaterialTheme.colorScheme.primary
+            )
+        }
+        IconButton(onClick = onRequestDelete) {
+            Icon(
+                imageVector = Icons.Filled.DeleteForever,
+                contentDescription = "Eliminar permanentemente",
+                modifier = Modifier.size(20.dp),
+                tint = MaterialTheme.colorScheme.error
+            )
+        }
     }
 }
 

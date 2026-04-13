@@ -10,6 +10,8 @@ import com.agentasker.features.login.data.datasources.remote.model.RegisterReque
 import com.agentasker.features.login.domain.entities.AuthToken
 import com.agentasker.features.login.domain.entities.User
 import com.agentasker.features.login.domain.repositories.AuthRepository
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 
 class AuthRepositoryImpl @Inject constructor(
@@ -90,5 +92,9 @@ class AuthRepositoryImpl @Inject constructor(
         val user = secureStorage.getUser()
         val tokenValid = secureStorage.isTokenValid()
         return user != null && tokenValid
+    }
+
+    override fun observeIsLoggedIn(): Flow<Boolean> {
+        return secureStorage.observeAuthToken().map { it != null }
     }
 }

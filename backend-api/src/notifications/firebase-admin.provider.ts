@@ -11,17 +11,6 @@ interface ResolvedCredential {
   source: string;
 }
 
-/**
- * Provider que inicializa (una sola vez) el Firebase Admin SDK.
- *
- * Busca la service-account key en este orden:
- *  1. `FIREBASE_SERVICE_ACCOUNT_PATH` env var → ruta a un JSON en disco
- *  2. `FIREBASE_SERVICE_ACCOUNT_JSON` env var → contenido del JSON inline
- *  3. Archivo `fcm-service-account.json` en la raíz del backend
- *
- * Si no encuentra credenciales devuelve `null` y el servicio loguea una
- * advertencia: el backend arranca igual pero los pushes son no-op.
- */
 export const firebaseAdminProvider = {
   provide: FIREBASE_ADMIN,
   useFactory: (): admin.app.App | null => {
@@ -47,8 +36,6 @@ export const firebaseAdminProvider = {
         return null;
       }
 
-      // Pasamos `projectId` explícitamente para que `app.options.projectId`
-      // quede poblado (si no, solo vive dentro de la credencial).
       const app = admin.initializeApp({
         credential: resolved.credential,
         projectId: resolved.projectId,
@@ -64,14 +51,9 @@ export const firebaseAdminProvider = {
   },
 };
 
-/**
- * Lee el JSON del service account y devuelve la credential + projectId.
- * Intentamos las 3 fuentes en orden de prioridad.
- */
 function resolveCredential(): ResolvedCredential | null {
   const logger = new Logger('FirebaseAdmin');
 
-  // 1. Path explícito por env var
   const explicitPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH;
   if (explicitPath && fs.existsSync(explicitPath)) {
     const json = JSON.parse(fs.readFileSync(explicitPath, 'utf8'));
@@ -82,7 +64,6 @@ function resolveCredential(): ResolvedCredential | null {
     };
   }
 
-  // 2. JSON inline por env var
   const inlineJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
   if (inlineJson) {
     try {
@@ -99,7 +80,6 @@ function resolveCredential(): ResolvedCredential | null {
     }
   }
 
-  // 3. Archivo por defecto en la raíz del backend
   const defaultPath = path.resolve(process.cwd(), 'fcm-service-account.json');
   if (fs.existsSync(defaultPath)) {
     const json = JSON.parse(fs.readFileSync(defaultPath, 'utf8'));

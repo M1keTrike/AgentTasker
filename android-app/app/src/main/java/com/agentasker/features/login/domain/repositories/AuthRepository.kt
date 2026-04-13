@@ -2,6 +2,7 @@ package com.agentasker.features.login.domain.repositories
 
 import com.agentasker.features.login.domain.entities.AuthToken
 import com.agentasker.features.login.domain.entities.User
+import kotlinx.coroutines.flow.Flow
 
 interface AuthRepository {
     suspend fun signInWithGoogle(idToken: String): Result<User>
@@ -14,5 +15,7 @@ interface AuthRepository {
     suspend fun getAuthToken(): AuthToken?
     suspend fun clearAuthToken()
     suspend fun isUserLoggedIn(): Boolean
+
+    fun observeIsLoggedIn(): Flow<Boolean>
 }
 

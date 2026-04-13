@@ -1,5 +1,6 @@
 package com.agentasker.core.hardware
 
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -48,14 +49,68 @@ class NotificationHelper @Inject constructor(
                 description = "Mensajes push enviados desde el servidor (FCM)"
             }
             notificationManager.createNotificationChannel(pushChannel)
+
+            val aiChannel = NotificationChannel(
+                AI_PROGRESS_CHANNEL,
+                "Procesos de IA",
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = "Progreso de análisis y generación de tareas con IA"
+                setShowBadge(false)
+                setSound(null, null)
+                enableVibration(false)
+                enableLights(false)
+            }
+            notificationManager.createNotificationChannel(aiChannel)
         }
     }
 
+    fun buildAiProgressNotification(title: String, body: String): Notification {
+        return NotificationCompat.Builder(context, AI_PROGRESS_CHANNEL)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(title)
+            .setContentText(body)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setProgress(0, 0, true)
+            .build()
+    }
+
+    fun showAiResultNotification(
+        title: String,
+        body: String,
+        @Suppress("UNUSED_PARAMETER") success: Boolean,
+        screen: String = "tasks",
+        taskId: String? = null
+    ) {
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            putExtra("screen", screen)
+            if (taskId != null) putExtra("taskId", taskId)
+        }
+        val notificationId = System.currentTimeMillis().toInt()
+        val pendingIntent = PendingIntent.getActivity(
+            context, notificationId, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val notification = NotificationCompat.Builder(context, AI_PROGRESS_CHANNEL)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(title)
+            .setContentText(body)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setCategory(NotificationCompat.CATEGORY_STATUS)
+            .setSilent(true)
+            .setOnlyAlertOnce(true)
+            .setContentIntent(pendingIntent)
+            .setAutoCancel(true)
+            .build()
+
+        notificationManager.notify(notificationId, notification)
+    }
+
     fun showPushNotification(title: String, body: String, data: Map<String, String> = emptyMap()) {
-        // FLAG_ACTIVITY_SINGLE_TOP en vez de CLEAR_TASK para que, si la Activity
-        // ya está en el top del stack, Android invoque onNewIntent() con los
-        // extras en lugar de recrearla desde cero — así el deep link se procesa
-        // sin perder el estado de navegación actual.
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
             data.forEach { (k, v) -> putExtra(k, v) }
@@ -124,5 +179,9 @@ class NotificationHelper @Inject constructor(
         const val TASK_REMINDERS_CHANNEL = "task_reminders"
         const val CLASSROOM_CHANNEL = "classroom_tasks"
         const val PUSH_CHANNEL = "push_notifications"
+        const val AI_PROGRESS_CHANNEL = "ai_progress"
+
+        const val AI_SUBTASK_WORKER_NOTIFICATION_ID = 2001
+        const val AI_IMAGE_WORKER_NOTIFICATION_ID = 2002
     }
 }

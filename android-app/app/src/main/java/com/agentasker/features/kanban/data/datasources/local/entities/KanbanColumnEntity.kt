@@ -12,5 +12,5 @@ data class KanbanColumnEntity(
     val position: Int = 0,
     val color: String? = null,
     val isSynced: Boolean = true,
-    val pendingAction: String? = null // "create", "update", "delete", or null (synced)
+    val pendingAction: String? = null
 )

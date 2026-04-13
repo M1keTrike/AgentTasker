@@ -9,6 +9,20 @@
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
+    <!-- Foreground service + data-sync type: requerido por los workers de IA
+         (AiSubtaskGenerationWorker, AiImageAnalysisWorker) que llaman a
+         setForeground() para sobrevivir a un kill de la app. Android 14+
+         exige el tipo específico. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+
+    <!-- Cámara: usada solo para el tab Analyzer (captura con TakePicture).
+         La galería (PickVisualMedia) no requiere permiso. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature
+        android:name="android.hardware.camera"
+        android:required="false" />
+
 
     <application
         android:name=".AgentTaskerApplication"
@@ -101,6 +115,31 @@
             android:name=".features.tasks.presentation.service.TaskSyncService"
             android:enabled="true"
             android:exported="false" />
+
+        <!-- Override del SystemForegroundService de WorkManager para declarar
+             foregroundServiceType="dataSync". Necesario porque los workers de
+             IA (AiSubtaskGenerationWorker, AiImageAnalysisWorker) llaman a
+             setForeground(ForegroundInfo(..., FOREGROUND_SERVICE_TYPE_DATA_SYNC)),
+             y Android 14+ exige que ese tipo esté declarado en el <service>
+             del manifest. Sin este merge, el proceso crashea con
+             "foregroundServiceType 0x00000001 is not a subset of 0x00000000". -->
+        <service
+            android:name="androidx.work.impl.foreground.SystemForegroundService"
+            android:foregroundServiceType="dataSync"
+            tools:node="merge" />
+
+        <!-- FileProvider usado por el Analyzer para capturar fotos.
+             La app de cámara necesita una Uri content:// escribible.
+             Apunta al directorio de fotos privado de la app. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
 
 </manifest>

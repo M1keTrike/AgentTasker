@@ -35,6 +35,13 @@ android {
         val googleWebClientId = properties.getProperty("google.web.client.id", "")
         buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"$googleWebClientId\"")
         resValue("string", "google_web_client_id", googleWebClientId)
+
+        // DeepSeek (flujos de IA). La key va en local.properties y nunca se
+        // versiona. Si no está, los workers de IA fallan con un error claro.
+        val deepSeekApiKey = properties.getProperty("deepseek.api.key", "")
+        buildConfigField("String", "DEEPSEEK_API_KEY", "\"$deepSeekApiKey\"")
+        val deepSeekBaseUrl = properties.getProperty("deepseek.base.url", "https://api.deepseek.com/v1/")
+        buildConfigField("String", "DEEPSEEK_BASE_URL", "\"$deepSeekBaseUrl\"")
     }
 
     buildTypes {
@@ -135,6 +142,12 @@ dependencies {
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.androidx.hilt.work)
     ksp(libs.androidx.hilt.work.compiler)
+
+    // IA — ML Kit OCR (bundled) + Kanban drag & drop + Coil (image preview)
+    implementation(libs.mlkit.text.recognition)
+    implementation(libs.kotlinx.coroutines.play.services)
+    implementation(libs.reorderable)
+    implementation(libs.coil.compose)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

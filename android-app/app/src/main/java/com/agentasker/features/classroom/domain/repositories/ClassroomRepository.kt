@@ -9,4 +9,8 @@ interface ClassroomRepository {
     suspend fun getTasksByCourse(courseId: String): Result<List<ClassroomTask>>
     suspend fun getAllTasks(): Result<List<ClassroomTask>>
     suspend fun isClassroomConnected(): Result<Boolean>
+
+    suspend fun syncClassroomTasksToLocal(): Result<Int>
+
+    suspend fun syncClassroomTasksByCourses(courseIds: List<String>): Result<Int>
 }

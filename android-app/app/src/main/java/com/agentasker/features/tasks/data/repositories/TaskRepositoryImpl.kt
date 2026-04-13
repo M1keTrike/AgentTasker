@@ -3,17 +3,26 @@ package com.agentasker.features.tasks.data.repositories
 import android.util.Log
 import com.agentasker.core.network.AgentTaskerApi
 import com.agentasker.core.network.NetworkMonitor
+import com.agentasker.features.tasks.data.datasources.local.dao.SubtaskDao
 import com.agentasker.features.tasks.data.datasources.local.dao.TaskDao
+import com.agentasker.features.tasks.data.datasources.local.entities.SubtaskEntity
 import com.agentasker.features.tasks.data.datasources.local.entities.TaskEntity
+import com.agentasker.features.tasks.data.datasources.local.mapper.subtasksToDomain
 import com.agentasker.features.tasks.data.datasources.local.mapper.toDomain
 import com.agentasker.features.tasks.data.datasources.local.mapper.toEntities
 import com.agentasker.features.tasks.data.datasources.local.mapper.toEntity
+import com.agentasker.features.tasks.data.datasources.remote.model.BulkCreateSubtasksRequest
+import com.agentasker.features.tasks.data.datasources.remote.model.CreateSubtaskRequest
 import com.agentasker.features.tasks.data.datasources.remote.model.CreateTaskRequest
+import com.agentasker.features.tasks.data.datasources.remote.model.UpdateSubtaskRequest
 import com.agentasker.features.tasks.data.datasources.remote.model.UpdateTaskRequest
 import com.agentasker.features.tasks.data.workers.TaskSyncScheduler
+import com.agentasker.features.tasks.domain.entities.Subtask
 import com.agentasker.features.tasks.domain.entities.Task
+import com.agentasker.features.tasks.domain.entities.TaskSource
 import com.agentasker.features.tasks.domain.repositories.TaskRepository
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import retrofit2.HttpException
@@ -24,6 +33,7 @@ private const val TAG = "TaskRepository"
 class TaskRepositoryImpl @Inject constructor(
     private val api: AgentTaskerApi,
     private val taskDao: TaskDao,
+    private val subtaskDao: SubtaskDao,
     private val networkMonitor: NetworkMonitor,
     private val syncScheduler: TaskSyncScheduler
 ) : TaskRepository {
@@ -31,7 +41,33 @@ class TaskRepositoryImpl @Inject constructor(
     private suspend fun isOnline(): Boolean = networkMonitor.isOnline.first()
 
     override fun observeTasks(): Flow<List<Task>> {
-        return taskDao.getAllTasks().map { entities -> entities.toDomain() }
+        return combine(
+            taskDao.getAllTasks(),
+            subtaskDao.observeAll()
+        ) { taskEntities, allSubtasks ->
+            val subsByTask = allSubtasks.groupBy { it.taskId }
+            taskEntities.map { entity ->
+                val subs = (subsByTask[entity.id] ?: emptyList())
+                    .sortedBy { it.position }
+                    .map { it.toDomain() }
+                entity.toDomain(subs)
+            }
+        }
+    }
+
+    override fun observeArchivedTasks(): Flow<List<Task>> {
+        return combine(
+            taskDao.getArchivedTasks(),
+            subtaskDao.observeAll()
+        ) { taskEntities, allSubtasks ->
+            val subsByTask = allSubtasks.groupBy { it.taskId }
+            taskEntities.map { entity ->
+                val subs = (subsByTask[entity.id] ?: emptyList())
+                    .sortedBy { it.position }
+                    .map { it.toDomain() }
+                entity.toDomain(subs)
+            }
+        }
     }
 
     override suspend fun refreshTasks() {
@@ -39,6 +75,23 @@ class TaskRepositoryImpl @Inject constructor(
         try {
             val remoteTasks = api.getTasks()
             taskDao.upsertTasks(remoteTasks.toEntities(isSynced = true))
+            remoteTasks.forEach { dto ->
+                dto.subtasks?.let { subs ->
+                    val entities = subs.map { sub ->
+                        SubtaskEntity(
+                            id = sub.id.toString(),
+                            taskId = sub.taskId.toString(),
+                            title = sub.title,
+                            isCompleted = sub.isCompleted,
+                            position = sub.position,
+                            createdAt = sub.createdAt,
+                            updatedAt = sub.updatedAt,
+                            isSynced = true
+                        )
+                    }
+                    if (entities.isNotEmpty()) subtaskDao.upsertAll(entities)
+                }
+            }
         } catch (_: Exception) { }
     }
 
@@ -53,20 +106,49 @@ class TaskRepositoryImpl @Inject constructor(
                 val response = api.getTaskById(id.toInt())
                 val entity = response.toEntity(isSynced = true)
                 taskDao.upsertTask(entity)
-                return entity.toDomain()
+                val subs = response.subtasks.orEmpty().map { sub ->
+                    SubtaskEntity(
+                        id = sub.id.toString(),
+                        taskId = id,
+                        title = sub.title,
+                        isCompleted = sub.isCompleted,
+                        position = sub.position,
+                        createdAt = sub.createdAt,
+                        updatedAt = sub.updatedAt,
+                        isSynced = true
+                    )
+                }
+                if (subs.isNotEmpty()) subtaskDao.upsertAll(subs)
+                return entity.toDomain(subs.map { it.toDomain() })
             } catch (_: Exception) { }
         }
-        return taskDao.getTaskById(id).first()?.toDomain()
+        val cached = taskDao.getTaskById(id).first()
             ?: throw Exception("Tarea no encontrada")
+        val subs = subtaskDao.getByTaskId(id).map { it.toDomain() }
+        return cached.toDomain(subs)
     }
 
-    override suspend fun createTask(title: String, description: String, priority: String, status: String, dueDate: String?): Task {
+    override suspend fun createTask(
+        title: String,
+        description: String,
+        priority: String,
+        status: String,
+        dueDate: String?,
+        source: String?,
+        externalId: String?,
+        courseName: String?,
+        externalLink: String?
+    ): Task {
         val request = CreateTaskRequest(
             title = title,
             description = description,
             priority = priority,
             status = status,
-            dueDate = dueDate
+            dueDate = dueDate,
+            source = source,
+            externalId = externalId,
+            courseName = courseName,
+            externalLink = externalLink
         )
         Log.d(TAG, "createTask online=${isOnline()} request=$request")
         if (isOnline()) {
@@ -90,6 +172,10 @@ class TaskRepositoryImpl @Inject constructor(
             priority = priority,
             status = status,
             dueDate = dueDate,
+            source = source ?: TaskSource.LOCAL,
+            externalId = externalId,
+            courseName = courseName,
+            externalLink = externalLink,
             isSynced = false,
             pendingAction = "create"
         )
@@ -104,16 +190,18 @@ class TaskRepositoryImpl @Inject constructor(
         description: String?,
         priority: String?,
         status: String?,
-        dueDate: String?
+        dueDate: String?,
+        isArchived: Boolean?
     ): Task {
         val request = UpdateTaskRequest(
             title = title,
             description = description,
             priority = priority,
             status = status,
-            dueDate = dueDate
+            dueDate = dueDate,
+            isArchived = isArchived
         )
-        if (isOnline()) {
+        if (isOnline() && id.toIntOrNull() != null) {
             try {
                 val response = api.updateTask(id.toInt(), request)
                 val entity = response.toEntity(isSynced = true)
@@ -130,12 +218,25 @@ class TaskRepositoryImpl @Inject constructor(
             priority = priority ?: current.priority,
             status = status ?: current.status,
             dueDate = dueDate ?: current.dueDate,
+            isArchived = isArchived ?: current.isArchived,
             isSynced = false,
             pendingAction = action
         )
         taskDao.upsertTask(updated)
         syncScheduler.scheduleSyncOnConnectivity()
         return updated.toDomain()
+    }
+
+    override suspend fun completeAndArchive(id: String): Task {
+        return updateTask(
+            id = id,
+            title = null,
+            description = null,
+            priority = null,
+            status = "completed",
+            dueDate = null,
+            isArchived = true
+        )
     }
 
     override suspend fun deleteTask(id: String) {
@@ -160,5 +261,177 @@ class TaskRepositoryImpl @Inject constructor(
         } else {
             taskDao.deleteTaskById(id)
         }
+    }
+
+    override fun observeSubtasks(taskId: String): Flow<List<Subtask>> {
+        return subtaskDao.observeByTaskId(taskId).map { it.subtasksToDomain() }
+    }
+
+    override suspend fun getSubtasks(taskId: String): List<Subtask> {
+        if (isOnline()) {
+            try {
+                val response = api.getSubtasks(taskId.toInt())
+                val entities = response.map { dto ->
+                    SubtaskEntity(
+                        id = dto.id.toString(),
+                        taskId = dto.taskId.toString(),
+                        title = dto.title,
+                        isCompleted = dto.isCompleted,
+                        position = dto.position,
+                        createdAt = dto.createdAt,
+                        updatedAt = dto.updatedAt,
+                        isSynced = true
+                    )
+                }
+                subtaskDao.upsertAll(entities)
+                return entities.map { it.toDomain() }
+            } catch (_: Exception) { }
+        }
+        return subtaskDao.getByTaskId(taskId).map { it.toDomain() }
+    }
+
+    override suspend fun createSubtasksBulk(taskId: String, titles: List<String>): List<Subtask> {
+        if (titles.isEmpty()) return emptyList()
+
+        if (isOnline() && taskId.toIntOrNull() != null) {
+            try {
+                val response = api.createSubtasksBulk(
+                    taskId.toInt(),
+                    BulkCreateSubtasksRequest(subtasks = titles)
+                )
+                val entities = response.map { dto ->
+                    SubtaskEntity(
+                        id = dto.id.toString(),
+                        taskId = taskId,
+                        title = dto.title,
+                        isCompleted = dto.isCompleted,
+                        position = dto.position,
+                        createdAt = dto.createdAt,
+                        updatedAt = dto.updatedAt,
+                        isSynced = true
+                    )
+                }
+                subtaskDao.upsertAll(entities)
+                return entities.map { it.toDomain() }
+            } catch (e: Exception) {
+                Log.w(TAG, "createSubtasksBulk online falló: ${e.message}", e)
+            }
+        }
+
+        val existingCount = subtaskDao.countByTaskId(taskId)
+        val now = System.currentTimeMillis()
+        val entities = titles.mapIndexed { idx, title ->
+            SubtaskEntity(
+                id = "local_sub_${now}_$idx",
+                taskId = taskId,
+                title = title,
+                position = existingCount + idx,
+                isSynced = false,
+                pendingAction = "create"
+            )
+        }
+        subtaskDao.upsertAll(entities)
+        syncScheduler.scheduleSyncOnConnectivity()
+        return entities.map { it.toDomain() }
+    }
+
+    override suspend fun createSubtask(taskId: String, title: String): Subtask {
+        return createSubtasksBulk(taskId, listOf(title)).first()
+    }
+
+    override suspend fun updateSubtask(subtaskId: String, title: String?, isCompleted: Boolean?): Subtask {
+        val current = subtaskDao.getByIdSync(subtaskId)
+            ?: throw Exception("Subtarea no encontrada")
+
+        if (isOnline() && subtaskId.toIntOrNull() != null) {
+            try {
+                val response = api.updateSubtask(
+                    subtaskId.toInt(),
+                    UpdateSubtaskRequest(title = title, isCompleted = isCompleted)
+                )
+                val synced = SubtaskEntity(
+                    id = response.id.toString(),
+                    taskId = response.taskId.toString(),
+                    title = response.title,
+                    isCompleted = response.isCompleted,
+                    position = response.position,
+                    createdAt = response.createdAt,
+                    updatedAt = response.updatedAt,
+                    isSynced = true
+                )
+                subtaskDao.upsert(synced)
+                return synced.toDomain()
+            } catch (_: Exception) { }
+        }
+
+        val action = if (current.pendingAction == "create") "create" else "update"
+        val updated = current.copy(
+            title = title ?: current.title,
+            isCompleted = isCompleted ?: current.isCompleted,
+            isSynced = false,
+            pendingAction = action
+        )
+        subtaskDao.upsert(updated)
+        syncScheduler.scheduleSyncOnConnectivity()
+        return updated.toDomain()
+    }
+
+    override suspend fun deleteSubtask(subtaskId: String) {
+        val existing = subtaskDao.getByIdSync(subtaskId) ?: return
+
+        if (existing.pendingAction == "create") {
+            subtaskDao.deleteById(subtaskId)
+            return
+        }
+
+        if (isOnline() && subtaskId.toIntOrNull() != null) {
+            try {
+                api.deleteSubtask(subtaskId.toInt())
+                subtaskDao.deleteById(subtaskId)
+                return
+            } catch (_: Exception) { }
+        }
+
+        subtaskDao.upsert(existing.copy(isSynced = false, pendingAction = "delete"))
+        syncScheduler.scheduleSyncOnConnectivity()
+    }
+
+    override suspend fun replaceSubtasks(taskId: String, titles: List<String>): List<Subtask> {
+        val existing = subtaskDao.getByTaskId(taskId)
+        existing.forEach { sub ->
+            try { deleteSubtask(sub.id) } catch (e: Exception) {
+                Log.w(TAG, "replaceSubtasks: fallo borrando sub ${sub.id}: ${e.message}")
+            }
+        }
+        return createSubtasksBulk(taskId, titles)
+    }
+
+    override suspend fun upsertImportedTask(task: Task): Task {
+        val existing = task.externalId?.let { taskDao.findByExternalId(it) }
+
+        if (existing?.pendingAction == "delete") {
+            return existing.toDomain()
+        }
+
+        val entity = if (existing != null) {
+            val needsSync = existing.id.toIntOrNull() != null
+            task.toEntity(
+                isSynced = if (needsSync) false else existing.isSynced,
+                pendingAction = if (needsSync) "update" else existing.pendingAction
+            ).copy(
+                id = existing.id,
+                isArchived = existing.isArchived,
+                status = if (existing.status == "pending") task.status else existing.status
+            )
+        } else {
+            task.toEntity(isSynced = false, pendingAction = "create")
+        }
+        taskDao.upsertTask(entity)
+
+        if (entity.pendingAction != null) {
+            syncScheduler.scheduleSyncOnConnectivity()
+        }
+
+        return entity.toDomain()
     }
 }

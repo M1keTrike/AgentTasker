@@ -11,11 +11,6 @@ export interface PushPayload {
   data?: Record<string, string>;
 }
 
-/**
- * Envía notificaciones push a un usuario específico vía FCM HTTP v1 API
- * (firebase-admin). Si el usuario no tiene `fcmToken` registrado, la llamada
- * se salta silenciosamente y loguea un warning.
- */
 @Injectable()
 export class PushNotificationService {
   private readonly logger = new Logger(PushNotificationService.name);
@@ -70,8 +65,6 @@ export class PushNotificationService {
       this.logger.error(
         `Error enviando push: ${error.code ?? 'unknown'} - ${error.message}`,
       );
-      // Si el token es inválido (unregistered / invalid-argument), limpiamos
-      // el fcmToken del usuario para evitar reintentos.
       if (
         error.code === 'messaging/registration-token-not-registered' ||
         error.code === 'messaging/invalid-argument'

@@ -45,7 +45,7 @@ fun TaskScreen(
 
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
-    ) { /* Permission result handled silently */ }
+    ) { }
 
     LaunchedEffect(Unit) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -60,17 +60,35 @@ fun TaskScreen(
         }
     }
 
+    LaunchedEffect(uiState.infoMessage) {
+        uiState.infoMessage?.let { message ->
+            snackbarHostState.showSnackbar(message)
+            viewModel.clearInfoMessage()
+        }
+    }
+
     if (uiState.showDialog) {
+        val editingTaskId = uiState.taskToEdit?.id
+        val subtasksForEditing = editingTaskId?.let { id ->
+            uiState.tasks.firstOrNull { it.id == id }?.subtasks.orEmpty()
+        } ?: emptyList()
+
         TaskFormDialog(
             task = uiState.taskToEdit,
             title = uiState.formTitle,
             description = uiState.formDescription,
             priority = uiState.formPriority,
             reminderAt = uiState.formReminderAt,
+            subtasks = subtasksForEditing,
             onTitleChange = viewModel::updateFormTitle,
             onDescriptionChange = viewModel::updateFormDescription,
             onPriorityChange = viewModel::updateFormPriority,
             onReminderAtChange = viewModel::updateFormReminderAt,
+            onAddSubtask = { title ->
+                editingTaskId?.let { viewModel.addManualSubtask(it, title) }
+            },
+            onRenameSubtask = viewModel::renameSubtask,
+            onDeleteSubtask = viewModel::deleteSubtask,
             onDismiss = {
                 viewModel.hideDialog()
             },
@@ -137,7 +155,10 @@ fun TaskScreen(
                                 },
                                 onDelete = {
                                     viewModel.deleteTask(task.id)
-                                }
+                                },
+                                onSplitWithAi = { viewModel.splitWithAi(task) },
+                                onToggleSubtask = { viewModel.toggleSubtask(it) },
+                                onComplete = { viewModel.completeAndArchive(task.id) }
                             )
                         }
                     }

@@ -8,6 +8,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.agentasker.features.login.domain.usecases.GetCurrentUserUseCase
 import com.agentasker.features.login.domain.usecases.LoginUseCase
+import com.agentasker.features.login.domain.usecases.ObserveAuthStateUseCase
 import com.agentasker.features.login.domain.usecases.RegisterUseCase
 import com.agentasker.features.login.domain.usecases.SignInWithGoogleUseCase
 import com.agentasker.features.login.domain.usecases.SignOutUseCase
@@ -27,6 +28,7 @@ class LoginViewModel @Inject constructor(
     private val signOutUseCase: SignOutUseCase,
     private val signInWithGoogleUseCase: SignInWithGoogleUseCase,
     private val getCurrentUserUseCase: GetCurrentUserUseCase,
+    private val observeAuthStateUseCase: ObserveAuthStateUseCase,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -35,6 +37,7 @@ class LoginViewModel @Inject constructor(
 
     init {
         checkAuthenticationState()
+        observeSessionValidity()
     }
 
     private fun checkAuthenticationState() {
@@ -48,6 +51,16 @@ class LoginViewModel @Inject constructor(
                     )
                 }
             } catch (e: Exception) {
+            }
+        }
+    }
+
+    private fun observeSessionValidity() {
+        viewModelScope.launch {
+            observeAuthStateUseCase().collect { isLoggedIn ->
+                if (!isLoggedIn && _uiState.value.isAuthenticated) {
+                    _uiState.value = LoginUiState()
+                }
             }
         }
     }

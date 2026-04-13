@@ -18,24 +18,6 @@ import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * Gestiona el token FCM del dispositivo.
- *
- * Responsabilidades:
- *  1. Persistir el token localmente en SharedPreferences (por si la app se
- *     abre sin red y luego necesita reenviarlo).
- *  2. Registrar un flag `syncedWithBackend` para saber si el backend ya tiene
- *     el token actual.
- *  3. Enviar el token al backend mediante [AgentTaskerApi.updateFcmToken]
- *     cuando el usuario esté autenticado (el AuthInterceptor añade el Bearer).
- *  4. Observar [SecureDataStoreTokenStorage.observeAuthToken] y reintentar
- *     el envío automáticamente en cuanto aparezca un accessToken válido.
- *     Esto cubre el caso en que el token FCM se obtiene antes del login.
- *
- * Nota: [AgentTaskerApi] se inyecta como [Lazy] porque este repositorio lo
- * usa también [AgentTaskerMessagingService], que puede construirse antes
- * que el resto del grafo Retrofit esté listo.
- */
 @Singleton
 class FcmTokenRepository @Inject constructor(
     @ApplicationContext context: Context,
@@ -47,14 +29,9 @@ class FcmTokenRepository @Inject constructor(
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
-    // Serializa todas las llamadas a syncWithBackend para evitar POSTs paralelos
-    // cuando fetchInitialFcmToken y onNewToken se disparan simultáneamente.
     private val syncMutex = Mutex()
 
     init {
-        // Reintenta el sync en cuanto el usuario se autentica o refresca su token.
-        // `.catch {}` evita que una excepción transitoria del DataStore
-        // (decriptación, I/O) mate el observer de forma silenciosa.
         scope.launch {
             tokenStorage.observeAuthToken()
                 .distinctUntilChangedBy { it?.accessToken }
@@ -70,7 +47,6 @@ class FcmTokenRepository @Inject constructor(
         }
     }
 
-    /** Persiste el token y dispara el envío al backend en segundo plano. */
     fun saveToken(token: String) {
         val previous = getToken()
         prefs.edit()
@@ -84,20 +60,10 @@ class FcmTokenRepository @Inject constructor(
         syncWithBackend()
     }
 
-    /** Devuelve el token local (puede ser null si FCM aún no lo entregó). */
     fun getToken(): String? = prefs.getString(KEY_TOKEN, null)
 
-    /** True si el backend ya recibió el token actual. */
     private fun isSynced(): Boolean = prefs.getBoolean(KEY_SYNCED, false)
 
-    /**
-     * Envía el token al backend si existe y aún no está sincronizado.
-     * Se puede llamar manualmente tras un login exitoso para forzar el envío.
-     *
-     * Protegido por [syncMutex] para evitar llamadas concurrentes cuando
-     * múltiples triggers (fetchInitialFcmToken, onNewToken, observer) se
-     * disparan al mismo tiempo.
-     */
     fun syncWithBackend() {
         scope.launch {
             syncMutex.withLock {
@@ -118,8 +84,6 @@ class FcmTokenRepository @Inject constructor(
                         )
                     }
                 } catch (e: Exception) {
-                    // 401: el usuario no está autenticado todavía; es normal,
-                    // se reintentará automáticamente desde el observer de authToken.
                     Log.w(TAG, "No se pudo enviar el token FCM al backend: ${e.message}")
                 }
             }
@@ -134,7 +98,6 @@ class FcmTokenRepository @Inject constructor(
     }
 }
 
-/** DTO del endpoint `POST /users/fcm-token`. */
 data class UpdateFcmTokenRequest(
     val fcmToken: String
 )

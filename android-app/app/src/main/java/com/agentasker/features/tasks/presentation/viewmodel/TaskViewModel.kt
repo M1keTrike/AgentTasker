@@ -4,8 +4,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.agentasker.core.hardware.HapticFeedbackManager
 import com.agentasker.core.hardware.ReminderScheduler
+import com.agentasker.features.tasks.data.workers.TaskSyncScheduler
+import com.agentasker.features.tasks.domain.entities.Subtask
 import com.agentasker.features.tasks.domain.entities.Task
 import com.agentasker.features.tasks.domain.repositories.TaskReminderRepository
+import com.agentasker.features.tasks.domain.repositories.TaskRepository
 import com.agentasker.features.tasks.domain.usecases.CreateTaskUseCase
 import com.agentasker.features.tasks.domain.usecases.DeleteTaskUseCase
 import com.agentasker.features.tasks.domain.usecases.GetTasksUseCase
@@ -21,17 +24,8 @@ import kotlinx.coroutines.launch
 import java.time.Instant
 import javax.inject.Inject
 
-/**
- * Convierte un timestamp (millis desde epoch) a un string ISO 8601 en UTC,
- * formato aceptado por `@IsDateString()` del backend NestJS.
- *
- * Ejemplo: `1744409383353` → `"2026-04-11T20:09:43.353Z"`.
- */
 private fun Long.toIsoString(): String = Instant.ofEpochMilli(this).toString()
 
-/**
- * Parsea un string ISO 8601 a millis. Retorna null si el string es inválido.
- */
 private fun String.toEpochMillisOrNull(): Long? = try {
     Instant.parse(this).toEpochMilli()
 } catch (_: Exception) {
@@ -46,7 +40,9 @@ class TaskViewModel @Inject constructor(
     private val deleteTaskUseCase: DeleteTaskUseCase,
     private val hapticFeedbackManager: HapticFeedbackManager,
     private val reminderScheduler: ReminderScheduler,
-    private val taskReminderRepository: TaskReminderRepository
+    private val taskReminderRepository: TaskReminderRepository,
+    private val taskRepository: TaskRepository,
+    private val taskSyncScheduler: TaskSyncScheduler
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(TaskUiState())
@@ -98,11 +94,7 @@ class TaskViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
 
-            // Si el usuario puso un recordatorio desde el picker, eso se envía
-            // como `dueDate` al backend para que el cron del server dispare el
-            // push. El `reminderAt` sigue programando el AlarmManager local
-            // como respaldo offline.
-            val effectiveDueDate = dueDate ?: reminderAt?.toIsoString()
+            val effectiveDueDate = reminderAt?.toIsoString() ?: dueDate
 
             createTaskUseCase(title, description, priority, status, effectiveDueDate).fold(
                 onSuccess = { task ->
@@ -130,10 +122,7 @@ class TaskViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
 
-            // Misma unificación que en createTask. Si el usuario cambió el
-            // reminder en el picker, el nuevo valor va como dueDate al backend
-            // para que el cron lo vuelva a disparar con la fecha actualizada.
-            val effectiveDueDate = dueDate ?: reminderAt?.toIsoString()
+            val effectiveDueDate = reminderAt?.toIsoString() ?: dueDate
 
             updateTaskUseCase(id, title, description, priority, status, effectiveDueDate).fold(
                 onSuccess = {
@@ -197,9 +186,6 @@ class TaskViewModel @Inject constructor(
     }
 
     fun showEditDialog(task: Task) {
-        // Si la task ya viene del backend con un dueDate, lo usamos como
-        // reminderAt inicial para que el picker muestre la fecha correcta.
-        // Si no, intentamos leer el reminder local guardado en Room.
         val initialReminderFromDueDate = task.dueDate?.toEpochMillisOrNull()
 
         _uiState.value = _uiState.value.copy(
@@ -255,5 +241,94 @@ class TaskViewModel @Inject constructor(
 
     fun updateFormReminderAt(reminderAt: Long?) {
         _uiState.value = _uiState.value.copy(formReminderAt = reminderAt)
+    }
+
+    fun splitWithAi(task: Task) {
+        if (task.description.isBlank()) {
+            _uiState.value = _uiState.value.copy(
+                error = "La tarea necesita una descripción para poder dividirla con IA."
+            )
+            return
+        }
+        taskSyncScheduler.scheduleAiSplit(task.id)
+        _uiState.value = _uiState.value.copy(
+            infoMessage = "Generando subtareas con IA… verás una notificación cuando termine."
+        )
+    }
+
+    fun toggleSubtask(subtask: Subtask) {
+        viewModelScope.launch {
+            try {
+                taskRepository.updateSubtask(
+                    subtaskId = subtask.id,
+                    isCompleted = !subtask.isCompleted
+                )
+                hapticFeedbackManager.success()
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    error = e.message ?: "Error al actualizar la subtarea"
+                )
+            }
+        }
+    }
+
+    fun completeAndArchive(taskId: String) {
+        viewModelScope.launch {
+            try {
+                taskRepository.completeAndArchive(taskId)
+                taskReminderRepository.deleteReminder(taskId)
+                reminderScheduler.cancelReminder(taskId)
+                hapticFeedbackManager.success()
+                _uiState.value = _uiState.value.copy(
+                    infoMessage = "Tarea completada y archivada."
+                )
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    error = e.message ?: "Error al completar la tarea"
+                )
+            }
+        }
+    }
+
+    fun addManualSubtask(taskId: String, title: String) {
+        if (title.isBlank()) return
+        viewModelScope.launch {
+            try {
+                taskRepository.createSubtask(taskId, title.trim())
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    error = e.message ?: "Error al agregar subtarea"
+                )
+            }
+        }
+    }
+
+    fun renameSubtask(subtaskId: String, newTitle: String) {
+        if (newTitle.isBlank()) return
+        viewModelScope.launch {
+            try {
+                taskRepository.updateSubtask(subtaskId = subtaskId, title = newTitle.trim())
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    error = e.message ?: "Error al renombrar subtarea"
+                )
+            }
+        }
+    }
+
+    fun deleteSubtask(subtaskId: String) {
+        viewModelScope.launch {
+            try {
+                taskRepository.deleteSubtask(subtaskId)
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    error = e.message ?: "Error al eliminar subtarea"
+                )
+            }
+        }
+    }
+
+    fun clearInfoMessage() {
+        _uiState.value = _uiState.value.copy(infoMessage = null)
     }
 }

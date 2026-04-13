@@ -5,14 +5,6 @@ import { Between, IsNull, Not, Repository } from 'typeorm';
 import { Task, TaskStatus } from '../tasks/entities/task.entity';
 import { PushNotificationService } from './push-notification.service';
 
-/**
- * Cron que corre cada minuto y envía pushes FCM para tareas cuyo `dueDate`
- * acaba de vencer.
- *
- * Ventana: [ahora - 1 min, ahora + 30 seg] para tolerar pequeños desfases
- * del scheduler. Una tarea solo se notifica UNA vez gracias a la columna
- * `reminderSent`.
- */
 @Injectable()
 export class TaskReminderCronService {
   private readonly logger = new Logger(TaskReminderCronService.name);
@@ -53,9 +45,6 @@ export class TaskReminderCronService {
         },
       });
 
-      // Marcamos como enviado incluso si falló el push (para no spamear al
-      // usuario con reintentos cada minuto). Si el fallo es por token
-      // inválido, PushNotificationService ya limpió el fcmToken.
       task.reminderSent = true;
       await this.taskRepository.save(task);
 

@@ -13,8 +13,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.CameraAlt
 import androidx.compose.material.icons.outlined.Dashboard
-import androidx.compose.material.icons.outlined.School
 import androidx.compose.material.icons.outlined.TaskAlt
 import androidx.compose.material.icons.outlined.ViewColumn
 import androidx.compose.material3.Icon
@@ -37,7 +37,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.agentasker.core.navigation.ClassroomRoute
+import com.agentasker.core.navigation.AnalyzerRoute
 import com.agentasker.core.navigation.DashboardRoute
 import com.agentasker.core.navigation.FeatureNavGraph
 import com.agentasker.core.navigation.KanbanRoute
@@ -65,13 +65,8 @@ class MainActivity : ComponentActivity() {
 
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { /* granted: no-op; si se niega, el usuario simplemente no verá pushes */ }
+    ) { }
 
-    /**
-     * Deep link pendiente de procesar. Se llena cuando la Activity arranca
-     * desde una notificación o cuando recibe `onNewIntent` con un payload
-     * que contiene `screen=...`. El Composable lo observa y navega.
-     */
     private val pendingDeepLink: MutableStateFlow<DeepLink?> = MutableStateFlow(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -93,21 +88,12 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    /**
-     * Se invoca cuando la Activity ya estaba creada (launchMode=singleTop)
-     * y Android reentrega un intent — por ejemplo cuando el usuario toca
-     * una notificación estando la app en foreground o background.
-     */
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
         DeepLink.fromIntent(intent)?.let { pendingDeepLink.value = it }
     }
 
-    /**
-     * Pide el permiso `POST_NOTIFICATIONS` en tiempo de ejecución (Android 13+).
-     * En versiones anteriores el permiso se concede automáticamente en el Manifest.
-     */
     private fun ensureNotificationPermission() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
 
@@ -137,8 +123,6 @@ fun AgentTaskerApp(
 
     val deepLink by pendingDeepLink.collectAsState()
 
-    // Navegación reactiva a un deep link. Solo dispara cuando el usuario ya
-    // está autenticado (si no, lo dejamos pendiente hasta que haga login).
     LaunchedEffect(deepLink, loginUiState.isAuthenticated) {
         val target = deepLink ?: return@LaunchedEffect
         if (!loginUiState.isAuthenticated) return@LaunchedEffect
@@ -147,7 +131,7 @@ fun AgentTaskerApp(
             DeepLink.Dashboard -> DashboardRoute
             DeepLink.Tasks -> TasksRoute
             DeepLink.Kanban -> KanbanRoute
-            DeepLink.Classroom -> ClassroomRoute
+            DeepLink.Classroom -> TasksRoute
         }
 
         navController.navigate(route) {
@@ -156,6 +140,14 @@ fun AgentTaskerApp(
             restoreState = true
         }
         onDeepLinkConsumed()
+    }
+
+    LaunchedEffect(loginUiState.isAuthenticated) {
+        if (!loginUiState.isAuthenticated) {
+            navController.navigate(LoginRoute) {
+                popUpTo(0) { inclusive = true }
+            }
+        }
     }
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -213,7 +205,7 @@ private fun BottomNavBar(
         BottomNavItem("Panel de estado", Icons.Outlined.Dashboard, DashboardRoute, TextAlign.Center),
         BottomNavItem("Tareas", Icons.Outlined.TaskAlt, TasksRoute),
         BottomNavItem("Kanban", Icons.Outlined.ViewColumn, KanbanRoute),
-        BottomNavItem("Classroom", Icons.Outlined.School, ClassroomRoute)
+        BottomNavItem("Analyzer", Icons.Outlined.CameraAlt, AnalyzerRoute)
     )
 
     NavigationBar {

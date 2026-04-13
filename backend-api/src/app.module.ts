@@ -5,6 +5,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { TasksModule } from './tasks/tasks.module';
+import { SubtasksModule } from './subtasks/subtasks.module';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { ClassroomModule } from './classroom/classroom.module';
@@ -32,6 +33,7 @@ import { NotificationsModule } from './notifications/notifications.module';
       logging: process.env.DB_LOGGING === 'true',
     }),
     TasksModule,
+    SubtasksModule,
     UsersModule,
     AuthModule,
     ClassroomModule,

@@ -32,6 +32,11 @@ export class TasksController {
     return this.tasksService.findAll(req.user.id);
   }
 
+  @Get('archived')
+  findArchived(@Request() req) {
+    return this.tasksService.findArchived(req.user.id);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string, @Request() req) {
     return this.tasksService.findOne(+id, req.user.id);

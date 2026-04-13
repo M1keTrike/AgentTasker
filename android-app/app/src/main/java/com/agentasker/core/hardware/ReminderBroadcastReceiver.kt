@@ -20,8 +20,6 @@ class ReminderBroadcastReceiver : BroadcastReceiver() {
         val title = intent.getStringExtra(EXTRA_TITLE) ?: "Recordatorio"
         val body = intent.getStringExtra(EXTRA_BODY) ?: "Tienes una tarea pendiente"
 
-        // Vibrar ANTES de mostrar la notificación para que el usuario sienta
-        // el aviso físico aunque tenga el teléfono en silencio.
         hapticFeedbackManager.notification()
         notificationHelper.showTaskReminder(taskId, title, body)
     }

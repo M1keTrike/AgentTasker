@@ -5,11 +5,6 @@ import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { Task } from './entities/task.entity';
 
-/**
- * Convierte un Date, un string ISO o null/undefined a millis (epoch).
- * Robusto contra el hecho de que TypeORM devuelve `Date` al leer, pero
- * `class-validator` mantiene strings cuando el DTO entra con `@IsDateString`.
- */
 function toMillis(value: Date | string | null | undefined): number | null {
   if (value == null) return null;
   if (value instanceof Date) return value.getTime();
@@ -28,8 +23,6 @@ export class TasksService {
   ) {}
 
   async create(createTaskDto: CreateTaskDto, userId: number): Promise<Task> {
-    // Una tarea recién creada siempre arranca con reminderSent=false para
-    // que el cron pueda dispararla cuando llegue su dueDate.
     const task = this.taskRepository.create({
       ...createTaskDto,
       userId,
@@ -39,12 +32,25 @@ export class TasksService {
   }
 
   async findAll(userId: number): Promise<Task[]> {
-    return await this.taskRepository.find({ where: { userId } });
+    return await this.taskRepository.find({
+      where: { userId, isArchived: false },
+      relations: ['subtasks'],
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  async findArchived(userId: number): Promise<Task[]> {
+    return await this.taskRepository.find({
+      where: { userId, isArchived: true },
+      relations: ['subtasks'],
+      order: { updatedAt: 'DESC' },
+    });
   }
 
   async findOne(id: number, userId: number): Promise<Task> {
     const task = await this.taskRepository.findOne({
       where: { id, userId },
+      relations: ['subtasks'],
     });
     if (!task) {
       throw new NotFoundException(`Task with ID ${id} not found`);
@@ -59,23 +65,12 @@ export class TasksService {
   ): Promise<Task> {
     const task = await this.findOne(id, userId);
 
-    // `task.dueDate` viene de la DB como Date; el DTO la trae como string ISO.
-    // Normalizamos a millis con un helper para poder compararlos sin crashes.
-    const previousDueDateMillis = toMillis(task.dueDate);
-
     Object.assign(task, updateTaskDto);
 
-    // Tras el assign, task.dueDate puede ser string (del DTO) o Date (si no
-    // se envió). Re-normalizamos para comparar y, si cambió, convertimos el
-    // string a Date real para que TypeORM lo persista como timestamp.
-    const newDueDateMillis = toMillis(task.dueDate);
-
-    if (previousDueDateMillis !== newDueDateMillis) {
+    if (task.dueDate != null) {
       task.reminderSent = false;
     }
 
-    // Asegurar tipo Date antes de save() — TypeORM puede aceptar el string,
-    // pero así evitamos sorpresas en futuras reads.
     if (typeof task.dueDate === 'string') {
       task.dueDate = new Date(task.dueDate);
     }

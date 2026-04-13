@@ -40,8 +40,6 @@ object NetworkModule {
     @Singleton
     fun provideHttpLoggingInterceptor(): HttpLoggingInterceptor {
         return HttpLoggingInterceptor().apply {
-            // En debug mostramos request + response completos para depurar
-            // sync fails; en release bajamos a BASIC para no filtrar PII.
             level = if (BuildConfig.DEBUG) {
                 HttpLoggingInterceptor.Level.BODY
             } else {

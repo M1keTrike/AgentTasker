@@ -3,7 +3,6 @@ package com.agentasker.features.kanban.presentation.viewmodel
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.agentasker.features.classroom.domain.repositories.ClassroomRepository
 import com.agentasker.features.kanban.domain.entities.KanbanColumn
 import com.agentasker.features.kanban.domain.entities.KanbanItem
 import com.agentasker.features.kanban.domain.usecases.CreateKanbanColumnUseCase
@@ -32,14 +31,12 @@ class KanbanViewModel @Inject constructor(
     private val deleteColumnUseCase: DeleteKanbanColumnUseCase,
     private val kanbanRepository: KanbanRepository,
     private val taskRepository: TaskRepository,
-    private val classroomRepository: ClassroomRepository,
     @ApplicationContext private val appContext: Context
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(KanbanUiState())
     val uiState: StateFlow<KanbanUiState> = _uiState.asStateFlow()
 
-    // Conexión al Bound Service de sincronización
     private val syncConnection = TaskSyncServiceConnection(appContext)
 
     init {
@@ -87,23 +84,6 @@ class KanbanViewModel @Inject constructor(
                     )
                 }
         }
-
-        loadClassroomTasks()
-    }
-
-    private fun loadClassroomTasks() {
-        viewModelScope.launch {
-            classroomRepository.getAllTasks().onSuccess { classroomTasks ->
-                val classroomItems = classroomTasks.map { KanbanItem.ClassroomItem(it) }
-                val currentMap = _uiState.value.tasksByStatus.toMutableMap()
-                for (item in classroomItems) {
-                    val list = currentMap.getOrDefault(item.status, emptyList()).toMutableList()
-                    list.add(item)
-                    currentMap[item.status] = list
-                }
-                _uiState.value = _uiState.value.copy(tasksByStatus = currentMap)
-            }
-        }
     }
 
     private fun refreshData() {
@@ -119,7 +99,6 @@ class KanbanViewModel @Inject constructor(
 
     fun refresh() {
         refreshData()
-        loadClassroomTasks()
     }
 
     fun showCreateColumnDialog() {
@@ -230,11 +209,6 @@ class KanbanViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(error = null)
     }
 
-    /**
-     * Dispara la sincronización vía el Bound Service.
-     * Si la conexión ya está establecida, llama directamente al método del
-     * servicio a través del Binder. Si no, cae al patrón Started Service.
-     */
     fun startTaskSyncService() {
         syncConnection.triggerSync()
     }
